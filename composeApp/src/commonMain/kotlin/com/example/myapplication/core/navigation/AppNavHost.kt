@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.myapplication.feature.login.presentation.LoginScreen
+import com.example.myapplication.feature.main.presentation.MainScreen
 import com.example.myapplication.feature.onboarding.presentation.WelcomeScreen
 
 @Composable
@@ -22,7 +23,19 @@ fun AppNavHost(
             WelcomeScreen(onContinue = { navController.navigate(AppDestination.Login.route) })
         }
         composable(AppDestination.Login.route) {
-            LoginScreen()
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(AppDestination.Main.route) {
+                        popUpTo(AppDestination.Welcome.route) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+        composable(AppDestination.Main.route) {
+            MainScreen()
         }
     }
 }
