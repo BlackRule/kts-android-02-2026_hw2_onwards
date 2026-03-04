@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.example.myapplication.common.ui.ImagePlaceholder
-import com.example.myapplication.common.ui.rememberAppImageLoader
 
 private const val WelcomeImageUrl =
     "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80"
@@ -31,8 +30,6 @@ fun WelcomeScreen(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val imageLoader = rememberAppImageLoader()
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -49,7 +46,6 @@ fun WelcomeScreen(
         SubcomposeAsyncImage(
             model = WelcomeImageUrl,
             contentDescription = "Nature landscape",
-            imageLoader = imageLoader,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
