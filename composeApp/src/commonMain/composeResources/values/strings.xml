@@ -1,0 +1,15 @@
+<resources>
+    <string name="image_unavailable">Image unavailable</string>
+    <string name="welcome_title">Welcome</string>
+    <string name="welcome_image_content_description">Nature landscape</string>
+    <string name="welcome_image_loading">Loading image...</string>
+    <string name="welcome_image_failed">Image failed to load</string>
+    <string name="welcome_message">Plan your day and keep every task in view.</string>
+    <string name="welcome_continue_button">Continue</string>
+    <string name="login_title">Login</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_email_placeholder">name@example.com</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_password_placeholder">Your password</string>
+    <string name="login_sign_in_button">Sign in</string>
+</resources>

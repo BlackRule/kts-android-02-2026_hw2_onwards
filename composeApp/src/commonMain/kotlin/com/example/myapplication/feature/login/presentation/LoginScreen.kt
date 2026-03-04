@@ -22,6 +22,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.login_email_label
+import myapplication.composeapp.generated.resources.login_email_placeholder
+import myapplication.composeapp.generated.resources.login_password_label
+import myapplication.composeapp.generated.resources.login_password_placeholder
+import myapplication.composeapp.generated.resources.login_sign_in_button
+import myapplication.composeapp.generated.resources.login_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LoginScreen(
@@ -38,14 +46,14 @@ fun LoginScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Login",
+            text = stringResource(Res.string.login_title),
             style = MaterialTheme.typography.headlineMedium,
         )
         TextField(
             value = login,
             onValueChange = { login = it },
-            label = { Text("Email") },
-            placeholder = { Text("name@example.com") },
+            label = { Text(text = stringResource(Res.string.login_email_label)) },
+            placeholder = { Text(text = stringResource(Res.string.login_email_placeholder)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
@@ -56,8 +64,8 @@ fun LoginScreen(
         TextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
-            placeholder = { Text("Your password") },
+            label = { Text(text = stringResource(Res.string.login_password_label)) },
+            placeholder = { Text(text = stringResource(Res.string.login_password_placeholder)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -71,7 +79,7 @@ fun LoginScreen(
             onClick = { },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = "Sign in")
+            Text(text = stringResource(Res.string.login_sign_in_button))
         }
     }
 }

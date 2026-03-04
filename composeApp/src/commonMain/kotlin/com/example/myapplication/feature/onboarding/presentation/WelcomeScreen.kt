@@ -21,6 +21,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.example.myapplication.common.ui.ImagePlaceholder
+import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.welcome_continue_button
+import myapplication.composeapp.generated.resources.welcome_image_content_description
+import myapplication.composeapp.generated.resources.welcome_image_failed
+import myapplication.composeapp.generated.resources.welcome_image_loading
+import myapplication.composeapp.generated.resources.welcome_message
+import myapplication.composeapp.generated.resources.welcome_title
+import org.jetbrains.compose.resources.stringResource
 
 private const val WelcomeImageUrl =
     "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80"
@@ -39,13 +47,13 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "Welcome",
+            text = stringResource(Res.string.welcome_title),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )
         SubcomposeAsyncImage(
             model = WelcomeImageUrl,
-            contentDescription = "Nature landscape",
+            contentDescription = stringResource(Res.string.welcome_image_content_description),
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
@@ -54,18 +62,18 @@ fun WelcomeScreen(
             loading = {
                 ImagePlaceholder(
                     modifier = Modifier.fillMaxSize(),
-                    text = "Loading image...",
+                    text = stringResource(Res.string.welcome_image_loading),
                 )
             },
             error = {
                 ImagePlaceholder(
                     modifier = Modifier.fillMaxSize(),
-                    text = "Image failed to load",
+                    text = stringResource(Res.string.welcome_image_failed),
                 )
             },
         )
         Text(
-            text = "Plan your day and keep every task in view.",
+            text = stringResource(Res.string.welcome_message),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -74,7 +82,7 @@ fun WelcomeScreen(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = "Continue")
+            Text(text = stringResource(Res.string.welcome_continue_button))
         }
     }
 }

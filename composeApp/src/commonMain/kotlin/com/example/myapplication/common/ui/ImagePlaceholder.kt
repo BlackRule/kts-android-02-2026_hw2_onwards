@@ -10,12 +10,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.image_unavailable
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ImagePlaceholder(
     modifier: Modifier = Modifier,
-    text: String = "Image unavailable",
+    text: String? = null,
 ) {
+    val displayText = text ?: stringResource(Res.string.image_unavailable)
+
     Box(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -24,7 +29,7 @@ fun ImagePlaceholder(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = text,
+            text = displayText,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
