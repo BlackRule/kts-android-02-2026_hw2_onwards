@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.common.ui.theme.AppTheme
 import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.login_email_label
@@ -81,5 +83,13 @@ fun LoginScreen(
         ) {
             Text(text = stringResource(Res.string.login_sign_in_button))
         }
+    }
+}
+
+@Preview
+@Composable
+private fun LoginScreenPreview() {
+    AppTheme {
+        LoginScreen()
     }
 }

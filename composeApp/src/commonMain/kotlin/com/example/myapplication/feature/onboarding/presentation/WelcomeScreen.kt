@@ -18,8 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import coil3.compose.SubcomposeAsyncImage
 import com.example.myapplication.common.ui.ImagePlaceholder
+import com.example.myapplication.common.ui.theme.AppTheme
 import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.welcome_continue_button
@@ -84,5 +86,13 @@ fun WelcomeScreen(
         ) {
             Text(text = stringResource(Res.string.welcome_continue_button))
         }
+    }
+}
+
+@Preview
+@Composable
+private fun WelcomeScreenPreview() {
+    AppTheme {
+        WelcomeScreen(onContinue = {})
     }
 }
