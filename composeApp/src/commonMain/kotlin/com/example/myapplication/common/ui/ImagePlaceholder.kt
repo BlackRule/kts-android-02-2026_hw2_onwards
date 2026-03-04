@@ -9,7 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.image_unavailable
 import org.jetbrains.compose.resources.stringResource
@@ -24,8 +24,8 @@ fun ImagePlaceholder(
     Box(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            .padding(12.dp),
+            .border(Dimens.thinBorder, MaterialTheme.colorScheme.outlineVariant)
+            .padding(Dimens.placeholderPadding),
         contentAlignment = Alignment.Center,
     ) {
         Text(

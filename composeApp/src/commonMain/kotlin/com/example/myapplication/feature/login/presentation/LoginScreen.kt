@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
+import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.login_email_label
 import myapplication.composeapp.generated.resources.login_email_placeholder
@@ -42,8 +42,8 @@ fun LoginScreen(
         modifier = modifier
             .fillMaxSize()
             .safeDrawingPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(Dimens.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(Dimens.contentSpacing),
     ) {
         Text(
             text = stringResource(Res.string.login_title),

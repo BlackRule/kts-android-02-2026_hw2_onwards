@@ -18,9 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.example.myapplication.common.ui.ImagePlaceholder
+import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.welcome_continue_button
 import myapplication.composeapp.generated.resources.welcome_image_content_description
@@ -42,8 +42,8 @@ fun WelcomeScreen(
         modifier = modifier
             .fillMaxSize()
             .safeDrawingPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(Dimens.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(Dimens.contentSpacing),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -57,8 +57,8 @@ fun WelcomeScreen(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
-                .clip(RoundedCornerShape(20.dp)),
+                .height(Dimens.welcomeImageHeight)
+                .clip(RoundedCornerShape(Dimens.cardCornerRadius)),
             loading = {
                 ImagePlaceholder(
                     modifier = Modifier.fillMaxSize(),
