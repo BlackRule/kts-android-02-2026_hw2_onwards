@@ -101,6 +101,8 @@ fun LoginScreen(
 @Composable
 private fun LoginScreenPreview() {
     AppTheme {
-        LoginScreen()
+        LoginScreen(
+            onLoginSuccess = {}
+        )
     }
 }
