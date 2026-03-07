@@ -6,8 +6,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.myapplication.feature.login.presentation.LoginScreen
-import com.example.myapplication.feature.main.presentation.MainScreen
 import com.example.myapplication.feature.onboarding.presentation.WelcomeScreen
+import com.example.myapplication.feature.shopPicker.presentation.ShopPickerScreen
 
 @Composable
 fun AppNavHost(
@@ -25,7 +25,7 @@ fun AppNavHost(
         composable(AppDestination.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(AppDestination.Main.route) {
+                    navController.navigate(AppDestination.ShopPicker.route) {
                         popUpTo(AppDestination.Welcome.route) {
                             inclusive = true
                         }
@@ -34,8 +34,8 @@ fun AppNavHost(
                 },
             )
         }
-        composable(AppDestination.Main.route) {
-            MainScreen()
+        composable(AppDestination.ShopPicker.route) {
+            ShopPickerScreen()
         }
     }
 }

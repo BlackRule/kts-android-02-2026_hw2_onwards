@@ -27,6 +27,28 @@ data class UsersListResponse(
 )
 
 @Serializable
+data class ShopResponse(
+    val id: Long,
+    val name: String,
+    val city: String,
+    val openingTime: String,
+    val closingTime: String,
+    val lat: Double,
+    val lon: Double,
+    val address: String,
+    val enabled: Boolean,
+)
+
+@Serializable
+data class ShopsListResponse(
+    val shops: List<ShopResponse>,
+    val page: Int,
+    val pageSize: Int,
+    val totalCount: Int,
+    val hasNextPage: Boolean,
+)
+
+@Serializable
 data class ErrorResponse(
     val message: String,
 )

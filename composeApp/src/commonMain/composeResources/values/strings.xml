@@ -12,4 +12,16 @@
     <string name="login_password_label">Password</string>
     <string name="login_password_placeholder">Your password</string>
     <string name="login_sign_in_button">Sign in</string>
+    <string name="shop_picker_title">Shop picker</string>
+    <string name="shop_picker_search_label">Search shops</string>
+    <string name="shop_picker_search_placeholder">Name, city, or address</string>
+    <string name="shop_picker_retry_button">Retry</string>
+    <string name="shop_picker_loading">Loading shops...</string>
+    <string name="shop_picker_empty_title">No shops found</string>
+    <string name="shop_picker_empty_message">Try another search query or clear the filter.</string>
+    <string name="shop_picker_empty_image_label">Empty list</string>
+    <string name="shop_picker_hours_label">Hours</string>
+    <string name="shop_picker_disabled_label">Temporarily unavailable</string>
+    <string name="shop_picker_load_error">Unable to load shops.</string>
+    <string name="shop_picker_load_more_error">Unable to load more shops.</string>
 </resources>
