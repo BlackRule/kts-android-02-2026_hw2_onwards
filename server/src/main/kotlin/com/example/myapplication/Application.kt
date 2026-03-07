@@ -23,12 +23,116 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.serialization.kotlinx.json.*
+import java.io.File
+import java.security.KeyStore
 
 fun main() {
-    val serverPort = System.getenv("SERVER_PORT")?.toIntOrNull() ?: SERVER_PORT
-    val serverHost = System.getenv("SERVER_HOST") ?: "0.0.0.0"
-    embeddedServer(Netty, port = serverPort, host = serverHost, module = Application::module)
+    val runtimeConfig = serverRuntimeConfigFromEnvironment()
+    embeddedServer(
+        factory = Netty,
+        environment = applicationEnvironment { },
+        configure = {
+            applyConnectors(runtimeConfig)
+        },
+        module = Application::module,
+    )
         .start(wait = true)
+}
+
+internal data class ServerRuntimeConfig(
+    val host: String,
+    val port: Int,
+    val tls: TlsConfig?,
+)
+
+internal data class TlsConfig(
+    val keyStorePath: String,
+    val keyStorePassword: String,
+    val privateKeyPassword: String,
+    val keyAlias: String,
+    val keyStoreType: String,
+)
+
+internal fun serverRuntimeConfigFromEnvironment(
+    environment: Map<String, String> = System.getenv(),
+): ServerRuntimeConfig {
+    val host = environment["SERVER_HOST"]?.takeIf(String::isNotBlank) ?: "0.0.0.0"
+    val port = environment["SERVER_PORT"]?.toIntOrNull() ?: DEFAULT_SERVER_PORT
+
+    return ServerRuntimeConfig(
+        host = host,
+        port = port,
+        tls = tlsConfigFromEnvironment(environment),
+    )
+}
+
+internal fun ApplicationEngine.Configuration.applyConnectors(config: ServerRuntimeConfig) {
+    val tlsConfig = config.tls
+    if (tlsConfig == null) {
+        connector {
+            port = config.port
+            host = config.host
+        }
+    } else {
+        sslConnector(
+            keyStore = loadKeyStore(tlsConfig),
+            keyAlias = tlsConfig.keyAlias,
+            keyStorePassword = { tlsConfig.keyStorePassword.toCharArray() },
+            privateKeyPassword = { tlsConfig.privateKeyPassword.toCharArray() },
+        ) {
+            port = config.port
+            host = config.host
+        }
+    }
+}
+
+private fun tlsConfigFromEnvironment(environment: Map<String, String>): TlsConfig? {
+    val keyStorePath = environment["SSL_KEYSTORE_PATH"].orEmpty().trim()
+    val keyStorePassword = environment["SSL_KEYSTORE_PASSWORD"].orEmpty()
+    val privateKeyPassword = environment["SSL_PRIVATE_KEY_PASSWORD"].orEmpty()
+    val keyAlias = environment["SSL_KEY_ALIAS"].orEmpty().trim()
+    val hasTlsConfiguration = listOf(
+        keyStorePath,
+        keyStorePassword,
+        privateKeyPassword,
+        keyAlias,
+    ).any(String::isNotBlank)
+
+    if (!hasTlsConfiguration) {
+        return null
+    }
+
+    val missingVariables = buildList {
+        if (keyStorePath.isBlank()) add("SSL_KEYSTORE_PATH")
+        if (keyStorePassword.isBlank()) add("SSL_KEYSTORE_PASSWORD")
+        if (privateKeyPassword.isBlank()) add("SSL_PRIVATE_KEY_PASSWORD")
+        if (keyAlias.isBlank()) add("SSL_KEY_ALIAS")
+    }
+
+    require(missingVariables.isEmpty()) {
+        "Incomplete HTTPS configuration. Missing: ${missingVariables.joinToString()}"
+    }
+
+    return TlsConfig(
+        keyStorePath = keyStorePath,
+        keyStorePassword = keyStorePassword,
+        privateKeyPassword = privateKeyPassword,
+        keyAlias = keyAlias,
+        keyStoreType = environment["SSL_KEYSTORE_TYPE"]?.takeIf(String::isNotBlank) ?: "PKCS12",
+    )
+}
+
+private fun loadKeyStore(tlsConfig: TlsConfig): KeyStore {
+    val keyStoreFile = File(tlsConfig.keyStorePath)
+    require(keyStoreFile.isFile) {
+        "HTTPS keystore file not found: ${keyStoreFile.absolutePath}"
+    }
+
+    return KeyStore.getInstance(tlsConfig.keyStoreType).apply {
+        keyStoreFile.inputStream().use { input ->
+            load(input, tlsConfig.keyStorePassword.toCharArray())
+        }
+    }
 }
 
 fun Application.module(

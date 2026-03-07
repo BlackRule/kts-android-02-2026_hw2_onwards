@@ -1,6 +1,5 @@
 package com.example.myapplication.core.network
 
-import com.example.myapplication.SERVER_BASE_URL
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -40,7 +39,7 @@ object AppHttpClient {
             }
 
             defaultRequest {
-                url(SERVER_BASE_URL)
+                url(serverBaseUrl)
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
             }
