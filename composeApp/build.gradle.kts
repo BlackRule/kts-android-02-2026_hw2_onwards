@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -20,6 +21,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.coil.network.okhttp)
+            implementation(libs.ktor.clientOkHttp)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -32,6 +34,11 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.coil.compose)
+            implementation(libs.napier)
+            implementation(libs.ktor.clientCore)
+            implementation(libs.ktor.clientContentNegotiation)
+            implementation(libs.ktor.clientLogging)
+            implementation(libs.ktor.serializationKotlinxJson)
             implementation(projects.shared)
         }
         commonTest.dependencies {
