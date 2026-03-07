@@ -9,6 +9,6 @@ WORKDIR /app
 
 COPY --from=build /workspace/server/build/install/server /app
 
-EXPOSE 8080
+EXPOSE 9878
 
 ENTRYPOINT ["./bin/server"]
