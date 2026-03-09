@@ -1,12 +1,16 @@
 package com.example.myapplication.feature.shoppingList.presentation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -18,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
@@ -26,6 +31,13 @@ import myapplication.composeapp.generated.resources.shopping_list_checkout_time_
 import myapplication.composeapp.generated.resources.shopping_list_checkout_time_placeholder
 import myapplication.composeapp.generated.resources.shopping_list_clear_shop_button
 import myapplication.composeapp.generated.resources.shopping_list_pick_time_button
+import myapplication.composeapp.generated.resources.shopping_list_row_amount_header
+import myapplication.composeapp.generated.resources.shopping_list_row_discount_header
+import myapplication.composeapp.generated.resources.shopping_list_row_final_price_header
+import myapplication.composeapp.generated.resources.shopping_list_row_item_header
+import myapplication.composeapp.generated.resources.shopping_list_row_price_header
+import myapplication.composeapp.generated.resources.shopping_list_table_hint
+import myapplication.composeapp.generated.resources.shopping_list_rows_add_button
 import myapplication.composeapp.generated.resources.shopping_list_save_button
 import myapplication.composeapp.generated.resources.shopping_list_saving_button
 import myapplication.composeapp.generated.resources.shopping_list_select_shop_button
@@ -58,6 +70,13 @@ internal fun ShoppingListContent(
     onPickPaidAt: () -> Unit,
     onUseCurrentTime: () -> Unit,
     onTotalChanged: (String) -> Unit,
+    shoppingRows: List<ShoppingListEntryUiState>,
+    onAddRow: () -> Unit,
+    onRowItemChanged: (Int, String) -> Unit,
+    onRowPriceChanged: (Int, String) -> Unit,
+    onRowDiscountChanged: (Int, String) -> Unit,
+    onRowFinalPriceChanged: (Int, String) -> Unit,
+    onRowAmountChanged: (Int, String) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -186,6 +205,42 @@ internal fun ShoppingListContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        Text(
+            text = stringResource(Res.string.shopping_list_table_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ShoppingTableHeader()
+                shoppingRows.forEachIndexed { index, row ->
+                    ShoppingTableRow(
+                        row = row,
+                        onItemChanged = { onRowItemChanged(index, it) },
+                        onPriceChanged = { onRowPriceChanged(index, it) },
+                        onDiscountChanged = { onRowDiscountChanged(index, it) },
+                        onFinalPriceChanged = { onRowFinalPriceChanged(index, it) },
+                        onAmountChanged = { onRowAmountChanged(index, it) },
+                    )
+                }
+            }
+        }
+
+        Button(
+            onClick = onAddRow,
+            enabled = !state.isSaving,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = stringResource(Res.string.shopping_list_rows_add_button))
+        }
+
         state.errorMessage?.let { errorMessage ->
             Text(
                 text = errorMessage,
@@ -208,4 +263,96 @@ internal fun ShoppingListContent(
             )
         }
     }
+}
+
+@Composable
+private fun ShoppingTableHeader() {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_item_header),
+            width = 160.dp,
+        )
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_price_header),
+            width = 110.dp,
+        )
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_discount_header),
+            width = 110.dp,
+        )
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_final_price_header),
+            width = 130.dp,
+        )
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_amount_header),
+            width = 110.dp,
+        )
+    }
+}
+
+@Composable
+private fun ShoppingTableRow(
+    row: ShoppingListEntryUiState,
+    onItemChanged: (String) -> Unit,
+    onPriceChanged: (String) -> Unit,
+    onDiscountChanged: (String) -> Unit,
+    onFinalPriceChanged: (String) -> Unit,
+    onAmountChanged: (String) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TableInputCell(
+            value = row.item,
+            onValueChanged = onItemChanged,
+            width = 160.dp,
+        )
+        TableInputCell(
+            value = row.priceInput,
+            onValueChanged = onPriceChanged,
+            width = 110.dp,
+        )
+        TableInputCell(
+            value = row.discountPercentInput,
+            onValueChanged = onDiscountChanged,
+            width = 110.dp,
+        )
+        TableInputCell(
+            value = row.finalPriceInput,
+            onValueChanged = onFinalPriceChanged,
+            width = 130.dp,
+        )
+        TableInputCell(
+            value = row.amountInput,
+            onValueChanged = onAmountChanged,
+            width = 110.dp,
+        )
+    }
+}
+
+@Composable
+private fun TableHeaderCell(
+    label: String,
+    width: Dp,
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .width(width)
+            .defaultMinSize(minHeight = 24.dp),
+    )
+}
+
+@Composable
+private fun TableInputCell(
+    value: String,
+    onValueChanged: (String) -> Unit,
+    width: Dp,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChanged,
+        singleLine = true,
+        modifier = Modifier.width(width),
+    )
 }
