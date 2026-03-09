@@ -25,12 +25,102 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SERVER_PORT: 8080
+      SERVER_PORT: ${SERVER_PORT:-9878}
       DB_URL: jdbc:postgresql://postgres:5432/myapplication
       DB_USER: myapp
       DB_PASSWORD: myapp
+      SHOPS_FILE_PATH: /data/stores.json
+      SSL_KEYSTORE_PATH: ${SSL_KEYSTORE_PATH:-}
+      SSL_KEYSTORE_PASSWORD: ${SSL_KEYSTORE_PASSWORD:-}
+      SSL_PRIVATE_KEY_PASSWORD: ${SSL_PRIVATE_KEY_PASSWORD:-}
+      SSL_KEY_ALIAS: ${SSL_KEY_ALIAS:-}
+      SSL_KEYSTORE_TYPE: ${SSL_KEYSTORE_TYPE:-PKCS12}
+    volumes:
+      - ./certs:/certs:ro
+      - ./data:/data
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        if [ -z "$${SSL_KEYSTORE_PATH}" ] && [ -f /certs/server-keystore.p12 ]; then
+          export SSL_KEYSTORE_PATH=/certs/server-keystore.p12
+        fi
+        if [ -n "$${SSL_KEYSTORE_PATH}" ]; then
+          export SSL_KEYSTORE_PASSWORD="$${SSL_KEYSTORE_PASSWORD:-changeit}"
+          export SSL_KEY_ALIAS="$${SSL_KEY_ALIAS:-myapplication}"
+          export SSL_KEYSTORE_TYPE="$${SSL_KEYSTORE_TYPE:-PKCS12}"
+          if [ -z "$${SSL_PRIVATE_KEY_PASSWORD}" ]; then
+            export SSL_PRIVATE_KEY_PASSWORD="$${SSL_KEYSTORE_PASSWORD}"
+          fi
+        fi
+        exec ./bin/server
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT:-9878}:${SERVER_PORT:-9878}"
+
+  server-test:
+    image: gradle:8.14.3-jdk17
+    profiles: ["testing"]
+    working_dir: /workspace
+    environment:
+      GRADLE_USER_HOME: /tmp/gradle-home
+    volumes:
+      - .:/workspace
+    command: ["gradle", "--project-cache-dir", "/tmp/project-cache", "--configure-on-demand", ":server:test", "--no-daemon"]
+
+  server-https-test:
+    image: gradle:8.14.3-jdk17
+    profiles: ["testing"]
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GRADLE_USER_HOME: /tmp/gradle-home
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 9878
+      DB_URL: jdbc:postgresql://postgres:5432/myapplication
+      DB_USER: myapp
+      DB_PASSWORD: myapp
+      SSL_KEYSTORE_PATH: /tmp/server-keystore.p12
+      SSL_KEYSTORE_PASSWORD: changeit
+      SSL_PRIVATE_KEY_PASSWORD: changeit
+      SSL_KEY_ALIAS: myapplication
+      SSL_KEYSTORE_TYPE: PKCS12
+    volumes:
+      - .:/workspace
+    command:
+      - bash
+      - -lc
+      - |
+        keytool -genkeypair \
+          -noprompt \
+          -alias "$${SSL_KEY_ALIAS}" \
+          -keyalg RSA \
+          -storetype "$${SSL_KEYSTORE_TYPE}" \
+          -keystore "$${SSL_KEYSTORE_PATH}" \
+          -storepass "$${SSL_KEYSTORE_PASSWORD}" \
+          -keypass "$${SSL_PRIVATE_KEY_PASSWORD}" \
+          -dname "CN=server-https-test, OU=Test, O=MyApplication, L=Kaliningrad, ST=Kaliningrad, C=RU" \
+          -ext "SAN=dns:server-https-test,ip:127.0.0.1" \
+          -validity 1
+        gradle --project-cache-dir /tmp/project-cache --configure-on-demand :server:run --no-daemon
+
+  https-smoke-test:
+    image: curlimages/curl:8.12.1
+    profiles: ["testing"]
+    depends_on:
+      - server-https-test
+    command:
+      - sh
+      - -c
+      - |
+        for attempt in $(seq 1 180); do
+          if curl --silent --show-error --fail --insecure https://server-https-test:9878/; then
+            exit 0
+          fi
+          sleep 2
+        done
+        exit 1
 
 volumes:
   postgres_data:
