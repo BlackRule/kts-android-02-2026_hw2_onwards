@@ -17,12 +17,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.core.location.findCurrentLocation
 import com.example.myapplication.core.location.hasLocationPermission
 import com.example.myapplication.core.location.locationPermissions
+import com.example.myapplication.feature.shopPicker.model.ShopItem
 import kotlinx.coroutines.launch
 
 @Composable
 actual fun ShopPickerScreen(
     initialQuery: String,
     onAddNewShop: () -> Unit,
+    onShopSelected: ((ShopItem) -> Unit)?,
     modifier: Modifier,
 ) {
     val viewModel: ShopPickerViewModel = viewModel()
@@ -101,6 +103,7 @@ actual fun ShopPickerScreen(
         isResolvingLocation = isResolvingLocation,
         onRequestLocation = ::requestLocationOrLoad,
         onAddNewShop = onAddNewShop,
+        onShopSelected = onShopSelected,
         modifier = modifier,
     )
 }

@@ -1,5 +1,8 @@
 package com.example.myapplication.feature.shopPicker.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class ShopItem(
     val id: Long,
     val name: String,

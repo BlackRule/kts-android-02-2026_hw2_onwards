@@ -79,6 +79,7 @@ import java.util.Locale
 
 @Composable
 actual fun CreateShopScreen(
+    returnToSelectionMode: Boolean,
     onBack: () -> Unit,
     onShopCreated: (String) -> Unit,
     modifier: Modifier,

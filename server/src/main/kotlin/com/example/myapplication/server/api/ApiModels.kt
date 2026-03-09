@@ -58,6 +58,26 @@ data class ShopsListResponse(
 )
 
 @Serializable
+data class ShoppingListResponse(
+    val id: Long,
+    val shop: ShopResponse,
+    val paidAt: String,
+    val totalAmountMinor: Long,
+)
+
+@Serializable
+data class ShoppingListsListResponse(
+    val shoppingLists: List<ShoppingListResponse>,
+)
+
+@Serializable
+data class UpsertShoppingListRequest(
+    val shopId: Long,
+    val paidAt: String,
+    val totalAmountMinor: Long,
+)
+
+@Serializable
 data class ErrorResponse(
     val message: String,
 )

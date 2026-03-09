@@ -1,5 +1,6 @@
 package com.example.myapplication.server.repository
 
+import com.example.myapplication.server.data.DatabaseFactory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.nio.charset.StandardCharsets
@@ -7,6 +8,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
+import java.sql.PreparedStatement
+import java.sql.ResultSet
+import java.sql.Types
 
 @Serializable
 data class ShopEntity(
@@ -44,7 +48,140 @@ interface ShopsRepository {
         pageSize: Int,
     ): Result<ShopsPageEntity>
 
+    fun getById(id: Long): Result<ShopEntity?>
+
     fun createShop(shop: CreateShopEntity): Result<ShopEntity>
+}
+
+class PostgresShopsRepository : ShopsRepository {
+
+    override fun getList(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): Result<ShopsPageEntity> {
+        return runCatching {
+            val normalizedQuery = query.trim()
+            val safePage = page.coerceAtLeast(1)
+            val safePageSize = pageSize.coerceIn(1, MAX_PAGE_SIZE)
+            val offset = (safePage - 1) * safePageSize
+
+            DatabaseFactory.getConnection().use { connection ->
+                val totalCount = connection.prepareStatement(
+                    """
+                    SELECT COUNT(*)
+                    FROM shops
+                    WHERE (? = '' OR name ILIKE ? OR COALESCE(city, '') ILIKE ? OR COALESCE(address, '') ILIKE ?)
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setSearchParameters(normalizedQuery)
+                    statement.executeQuery().use { resultSet ->
+                        resultSet.next()
+                        resultSet.getInt(1)
+                    }
+                }
+
+                val shops = connection.prepareStatement(
+                    """
+                    SELECT id, name, city, opening_time, closing_time, lat, lon, address, enabled
+                    FROM shops
+                    WHERE (? = '' OR name ILIKE ? OR COALESCE(city, '') ILIKE ? OR COALESCE(address, '') ILIKE ?)
+                    ORDER BY sort_order ASC, id DESC
+                    LIMIT ? OFFSET ?
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setSearchParameters(normalizedQuery)
+                    statement.setInt(5, safePageSize)
+                    statement.setInt(6, offset)
+                    statement.executeQuery().use { resultSet ->
+                        buildList {
+                            while (resultSet.next()) {
+                                add(resultSet.toShopEntity())
+                            }
+                        }
+                    }
+                }
+
+                ShopsPageEntity(
+                    shops = shops,
+                    page = safePage,
+                    pageSize = safePageSize,
+                    totalCount = totalCount,
+                    hasNextPage = offset + shops.size < totalCount,
+                )
+            }
+        }
+    }
+
+    override fun getById(id: Long): Result<ShopEntity?> {
+        return runCatching {
+            DatabaseFactory.getConnection().use { connection ->
+                connection.prepareStatement(
+                    """
+                    SELECT id, name, city, opening_time, closing_time, lat, lon, address, enabled
+                    FROM shops
+                    WHERE id = ?
+                    LIMIT 1
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setLong(1, id)
+                    statement.executeQuery().use { resultSet ->
+                        if (resultSet.next()) {
+                            resultSet.toShopEntity()
+                        } else {
+                            null
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun createShop(shop: CreateShopEntity): Result<ShopEntity> {
+        return runCatching {
+            val normalizedName = shop.name.trim()
+            require(normalizedName.isNotEmpty()) {
+                "Shop name is required"
+            }
+
+            DatabaseFactory.getConnection().use { connection ->
+                connection.prepareStatement(
+                    """
+                    INSERT INTO shops(
+                        sort_order,
+                        name,
+                        city,
+                        opening_time,
+                        closing_time,
+                        lat,
+                        lon,
+                        address,
+                        enabled
+                    )
+                    VALUES (
+                        (SELECT COALESCE(MIN(sort_order), 1) - 1 FROM shops),
+                        ?, ?, ?, ?, ?, ?, ?, TRUE
+                    )
+                    RETURNING id, name, city, opening_time, closing_time, lat, lon, address, enabled
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, normalizedName)
+                    statement.setNullableString(2, shop.city.normalizedOrNull())
+                    statement.setString(3, DEFAULT_OPENING_TIME)
+                    statement.setString(4, DEFAULT_CLOSING_TIME)
+                    statement.setNullableDouble(5, shop.lat)
+                    statement.setNullableDouble(6, shop.lon)
+                    statement.setNullableString(7, shop.address.normalizedOrNull())
+                    statement.executeQuery().use { resultSet ->
+                        require(resultSet.next()) {
+                            "Unable to create shop"
+                        }
+                        resultSet.toShopEntity()
+                    }
+                }
+            }
+        }
+    }
 }
 
 class JsonShopsRepository(
@@ -92,6 +229,12 @@ class JsonShopsRepository(
                 totalCount = filtered.size,
                 hasNextPage = toIndex < filtered.size,
             )
+        }
+    }
+
+    override fun getById(id: Long): Result<ShopEntity?> {
+        return runCatching {
+            loadShopsSnapshot().firstOrNull { it.id == id }
         }
     }
 
@@ -176,10 +319,6 @@ class JsonShopsRepository(
     }
 
     private companion object {
-        private const val MAX_PAGE_SIZE = 50
-        private const val DEFAULT_OPENING_TIME = "08:00"
-        private const val DEFAULT_CLOSING_TIME = "23:00"
-
         private fun defaultShopsStoragePath(): String {
             return System.getenv("SHOPS_FILE_PATH")
                 ?.takeIf(String::isNotBlank)
@@ -188,6 +327,53 @@ class JsonShopsRepository(
     }
 }
 
+private const val MAX_PAGE_SIZE = 50
+private const val DEFAULT_OPENING_TIME = "08:00"
+private const val DEFAULT_CLOSING_TIME = "23:00"
+
 private fun String?.normalizedOrNull(): String? {
     return this?.trim()?.takeIf(String::isNotEmpty)
+}
+
+private fun PreparedStatement.setSearchParameters(query: String) {
+    val pattern = "%$query%"
+    setString(1, query)
+    setString(2, pattern)
+    setString(3, pattern)
+    setString(4, pattern)
+}
+
+private fun PreparedStatement.setNullableString(index: Int, value: String?) {
+    if (value == null) {
+        setNull(index, Types.VARCHAR)
+    } else {
+        setString(index, value)
+    }
+}
+
+private fun PreparedStatement.setNullableDouble(index: Int, value: Double?) {
+    if (value == null) {
+        setNull(index, Types.DOUBLE)
+    } else {
+        setDouble(index, value)
+    }
+}
+
+private fun ResultSet.toShopEntity(): ShopEntity {
+    return ShopEntity(
+        id = getLong("id"),
+        name = getString("name"),
+        city = getString("city"),
+        openingTime = getString("opening_time"),
+        closingTime = getString("closing_time"),
+        lat = getNullableDouble("lat"),
+        lon = getNullableDouble("lon"),
+        address = getString("address"),
+        enabled = getBoolean("enabled"),
+    )
+}
+
+private fun ResultSet.getNullableDouble(columnName: String): Double? {
+    val value = getDouble(columnName)
+    return if (wasNull()) null else value
 }
