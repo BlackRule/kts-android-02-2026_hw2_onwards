@@ -1,5 +1,6 @@
 package com.example.myapplication.feature.shopPicker.presentation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-//import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -30,13 +29,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.common.ui.ImagePlaceholder
 import com.example.myapplication.common.ui.theme.AppTheme
 import com.example.myapplication.common.ui.theme.Dimens
 import com.example.myapplication.feature.shopPicker.model.ShopItem
 import kotlinx.coroutines.flow.distinctUntilChanged
 import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.shop_picker_add_new_button
+import myapplication.composeapp.generated.resources.shop_picker_closest_label
 import myapplication.composeapp.generated.resources.shop_picker_disabled_label
 import myapplication.composeapp.generated.resources.shop_picker_empty_image_label
 import myapplication.composeapp.generated.resources.shop_picker_empty_message
@@ -45,6 +45,9 @@ import myapplication.composeapp.generated.resources.shop_picker_hours_label
 import myapplication.composeapp.generated.resources.shop_picker_load_error
 import myapplication.composeapp.generated.resources.shop_picker_load_more_error
 import myapplication.composeapp.generated.resources.shop_picker_loading
+import myapplication.composeapp.generated.resources.shop_picker_location_permission_message
+import myapplication.composeapp.generated.resources.shop_picker_location_retry_button
+import myapplication.composeapp.generated.resources.shop_picker_location_unavailable_message
 import myapplication.composeapp.generated.resources.shop_picker_retry_button
 import myapplication.composeapp.generated.resources.shop_picker_search_label
 import myapplication.composeapp.generated.resources.shop_picker_search_placeholder
@@ -52,27 +55,28 @@ import myapplication.composeapp.generated.resources.shop_picker_title
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun ShopPickerScreen(
+expect fun ShopPickerScreen(
+    initialQuery: String,
+    onAddNewShop: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ShopPickerViewModel = viewModel(),
-) {
-    val state by viewModel.state.collectAsState()
+)
 
-    ShopPickerContent(
-        state = state,
-        modifier = modifier,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onRetry = viewModel::retry,
-        onLoadNextPage = viewModel::onLoadNextPage,
-    )
+internal enum class ShopPickerLocationBannerState {
+    Hidden,
+    PermissionRequired,
+    LocationUnavailable,
 }
 
 @Composable
-private fun ShopPickerContent(
+internal fun ShopPickerContent(
     state: ShopPickerUiState,
     onSearchQueryChanged: (String) -> Unit,
     onRetry: () -> Unit,
     onLoadNextPage: () -> Unit,
+    locationBannerState: ShopPickerLocationBannerState,
+    isResolvingLocation: Boolean,
+    onRequestLocation: () -> Unit,
+    onAddNewShop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -118,6 +122,14 @@ private fun ShopPickerContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        if (locationBannerState != ShopPickerLocationBannerState.Hidden || isResolvingLocation) {
+            LocationBanner(
+                bannerState = locationBannerState,
+                isResolvingLocation = isResolvingLocation,
+                onRequestLocation = onRequestLocation,
+            )
+        }
+
         when {
             state.isLoading && state.shops.isEmpty() -> {
                 LoadingState(
@@ -139,6 +151,8 @@ private fun ShopPickerContent(
 
             state.shops.isEmpty() -> {
                 EmptyState(
+                    showAddNewShopAction = state.query.isNotBlank(),
+                    onAddNewShop = onAddNewShop,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -155,7 +169,10 @@ private fun ShopPickerContent(
                         items = state.shops,
                         key = { index, shop -> "${shop.id}-$index" },
                     ) { _, shop ->
-                        ShopCard(shop = shop)
+                        ShopCard(
+                            shop = shop,
+                            isClosest = shop.id == state.closestShopId,
+                        )
                     }
 
                     if (state.isLoadingNextPage) {
@@ -179,25 +196,46 @@ private fun ShopPickerContent(
 }
 
 @Composable
-private fun ShopCard(shop: ShopItem) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun ShopCard(
+    shop: ShopItem,
+    isClosest: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        border = if (isClosest) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (isClosest) {
+                Text(
+                    text = stringResource(Res.string.shop_picker_closest_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
                 text = shop.name,
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(
-                text = shop.city,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = shop.address,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            shop.city?.takeIf { it.isNotBlank() }?.let { city ->
+                Text(
+                    text = city,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            shop.address?.takeIf { it.isNotBlank() }?.let { address ->
+                Text(
+                    text = address,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Text(
                 text = "${stringResource(Res.string.shop_picker_hours_label)}: ${shop.openingTime} - ${shop.closingTime}",
                 style = MaterialTheme.typography.bodySmall,
@@ -257,7 +295,11 @@ private fun ErrorState(
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
+private fun EmptyState(
+    showAddNewShopAction: Boolean,
+    onAddNewShop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center,
@@ -281,6 +323,43 @@ private fun EmptyState(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (showAddNewShopAction) {
+                Button(onClick = onAddNewShop) {
+                    Text(text = stringResource(Res.string.shop_picker_add_new_button))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationBanner(
+    bannerState: ShopPickerLocationBannerState,
+    isResolvingLocation: Boolean,
+    onRequestLocation: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = when {
+                    isResolvingLocation -> stringResource(Res.string.shop_picker_loading)
+                    bannerState == ShopPickerLocationBannerState.LocationUnavailable -> {
+                        stringResource(Res.string.shop_picker_location_unavailable_message)
+                    }
+
+                    else -> stringResource(Res.string.shop_picker_location_permission_message)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            if (!isResolvingLocation) {
+                TextButton(onClick = onRequestLocation) {
+                    Text(text = stringResource(Res.string.shop_picker_location_retry_button))
+                }
+            }
         }
     }
 }
@@ -341,12 +420,17 @@ private fun ShopPickerScreenPreview() {
                         enabled = true,
                     ),
                 ),
+                closestShopId = 60L,
                 currentPage = 1,
                 hasNextPage = true,
             ),
             onSearchQueryChanged = {},
             onRetry = {},
             onLoadNextPage = {},
+            locationBannerState = ShopPickerLocationBannerState.Hidden,
+            isResolvingLocation = false,
+            onRequestLocation = {},
+            onAddNewShop = {},
         )
     }
 }

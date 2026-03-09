@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import com.example.myapplication.server.api.ErrorResponse
+import com.example.myapplication.server.api.CreateShopRequest
 import com.example.myapplication.server.api.LoginRequest
 import com.example.myapplication.server.api.LoginResponse
 import com.example.myapplication.server.api.ShopResponse
@@ -8,10 +9,12 @@ import com.example.myapplication.server.api.ShopsListResponse
 import com.example.myapplication.server.api.UserResponse
 import com.example.myapplication.server.api.UsersListResponse
 import com.example.myapplication.server.data.DatabaseFactory
+import com.example.myapplication.server.repository.CreateShopEntity
 import com.example.myapplication.server.repository.JsonShopsRepository
 import com.example.myapplication.server.repository.LoginRepository
 import com.example.myapplication.server.repository.PostgresLoginRepository
 import com.example.myapplication.server.repository.PostgresUsersRepository
+import com.example.myapplication.server.repository.ShopEntity
 import com.example.myapplication.server.repository.ShopsRepository
 import com.example.myapplication.server.repository.UsersRepository
 import io.ktor.http.HttpStatusCode
@@ -169,17 +172,7 @@ fun Application.module(
                     status = HttpStatusCode.OK,
                     message = ShopsListResponse(
                         shops = shopsPage.shops.map { shop ->
-                            ShopResponse(
-                                id = shop.id,
-                                name = shop.name,
-                                city = shop.city,
-                                openingTime = shop.openingTime,
-                                closingTime = shop.closingTime,
-                                lat = shop.lat,
-                                lon = shop.lon,
-                                address = shop.address,
-                                enabled = shop.enabled,
-                            )
+                            shop.toResponse()
                         },
                         page = shopsPage.page,
                         pageSize = shopsPage.pageSize,
@@ -192,6 +185,36 @@ fun Application.module(
                 respond(
                     status = HttpStatusCode.InternalServerError,
                     message = ErrorResponse(exception?.message ?: "Unable to load shops"),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithCreatedShop() {
+            val request = receive<CreateShopRequest>()
+            val createResult = shopsRepository.createShop(
+                CreateShopEntity(
+                    name = request.name,
+                    city = request.city,
+                    lat = request.lat,
+                    lon = request.lon,
+                    address = request.address,
+                ),
+            )
+
+            if (createResult.isSuccess) {
+                respond(
+                    status = HttpStatusCode.Created,
+                    message = createResult.getOrThrow().toResponse(),
+                )
+            } else {
+                val exception = createResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to create shop"),
                 )
             }
         }
@@ -253,8 +276,30 @@ fun Application.module(
             call.respondWithShops()
         }
 
+        post("/shops") {
+            call.respondWithCreatedShop()
+        }
+
         get("/stores") {
             call.respondWithShops()
         }
+
+        post("/stores") {
+            call.respondWithCreatedShop()
+        }
     }
+}
+
+private fun ShopEntity.toResponse(): ShopResponse {
+    return ShopResponse(
+        id = id,
+        name = name,
+        city = city,
+        openingTime = openingTime,
+        closingTime = closingTime,
+        lat = lat,
+        lon = lon,
+        address = address,
+        enabled = enabled,
+    )
 }

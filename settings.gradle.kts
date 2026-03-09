@@ -1,6 +1,8 @@
 rootProject.name = "MyApplication"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+val includeComposeApp = startParameter.projectProperties["includeComposeApp"] != "false"
+
 pluginManagement {
     repositories {
         google {
@@ -28,6 +30,9 @@ dependencyResolutionManagement {
     }
 }
 
-include(":composeApp")
 include(":server")
 include(":shared")
+
+if (includeComposeApp) {
+    include(":composeApp")
+}

@@ -29,6 +29,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/myapplication
       DB_USER: myapp
       DB_PASSWORD: myapp
+      SHOPS_FILE_PATH: /data/stores.json
       SSL_KEYSTORE_PATH: ${SSL_KEYSTORE_PATH:-}
       SSL_KEYSTORE_PASSWORD: ${SSL_KEYSTORE_PASSWORD:-}
       SSL_PRIVATE_KEY_PASSWORD: ${SSL_PRIVATE_KEY_PASSWORD:-}
@@ -36,6 +37,7 @@ services:
       SSL_KEYSTORE_TYPE: ${SSL_KEYSTORE_TYPE:-PKCS12}
     volumes:
       - ./certs:/certs:ro
+      - ./data:/data
     entrypoint:
       - /bin/sh
       - -lc

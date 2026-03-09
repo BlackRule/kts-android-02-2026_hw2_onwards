@@ -30,13 +30,22 @@ data class UsersListResponse(
 data class ShopResponse(
     val id: Long,
     val name: String,
-    val city: String,
+    val city: String? = null,
     val openingTime: String,
     val closingTime: String,
-    val lat: Double,
-    val lon: Double,
-    val address: String,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val address: String? = null,
     val enabled: Boolean,
+)
+
+@Serializable
+data class CreateShopRequest(
+    val name: String,
+    val city: String? = null,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val address: String? = null,
 )
 
 @Serializable

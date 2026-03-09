@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import com.example.myapplication.server.repository.LoginRepository
+import com.example.myapplication.server.repository.CreateShopEntity
 import com.example.myapplication.server.repository.ShopEntity
 import com.example.myapplication.server.repository.ShopsPageEntity
 import com.example.myapplication.server.repository.ShopsRepository
@@ -39,7 +40,7 @@ class ApplicationTest {
     }
 
     private val fakeShopsRepository = object : ShopsRepository {
-        private val shops = listOf(
+        private val shops = mutableListOf(
             ShopEntity(
                 id = 60L,
                 name = "Универсам \"Спар №60\"",
@@ -102,6 +103,27 @@ class ApplicationTest {
                     hasNextPage = toIndex < filtered.size,
                 ),
             )
+        }
+
+        override fun createShop(shop: CreateShopEntity): Result<ShopEntity> {
+            val normalizedName = shop.name.trim()
+            if (normalizedName.isEmpty()) {
+                return Result.failure(IllegalArgumentException("Shop name is required"))
+            }
+
+            val createdShop = ShopEntity(
+                id = (shops.maxOfOrNull { it.id } ?: 0L) + 1L,
+                name = normalizedName,
+                city = shop.city,
+                openingTime = "08:00",
+                closingTime = "23:00",
+                lat = shop.lat,
+                lon = shop.lon,
+                address = shop.address,
+                enabled = true,
+            )
+            shops.add(0, createdShop)
+            return Result.success(createdShop)
         }
     }
 
@@ -195,5 +217,52 @@ class ApplicationTest {
         assertContains(response.bodyAsText(), "\"page\":2")
         assertContains(response.bodyAsText(), "SPAR Center")
         assertContains(response.bodyAsText(), "\"hasNextPage\":false")
+    }
+
+    @Test
+    fun testCreateShop() = testApplication {
+        application {
+            module(
+                initializeDatabase = false,
+                loginRepository = fakeLoginRepository,
+                usersRepository = fakeUsersRepository,
+                shopsRepository = fakeShopsRepository,
+            )
+        }
+
+        val createResponse = client.post("/shops") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"New Test Shop","city":"Калининград","lat":54.71,"lon":20.5,"address":"Тестовая, 1"}""")
+        }
+
+        assertEquals(HttpStatusCode.Created, createResponse.status)
+        assertContains(createResponse.bodyAsText(), "New Test Shop")
+
+        val listResponse = client.get("/shops") {
+            parameter("query", "New Test Shop")
+        }
+
+        assertEquals(HttpStatusCode.OK, listResponse.status)
+        assertContains(listResponse.bodyAsText(), "New Test Shop")
+    }
+
+    @Test
+    fun testCreateShopRejectsBlankName() = testApplication {
+        application {
+            module(
+                initializeDatabase = false,
+                loginRepository = fakeLoginRepository,
+                usersRepository = fakeUsersRepository,
+                shopsRepository = fakeShopsRepository,
+            )
+        }
+
+        val response = client.post("/shops") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"   "}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertContains(response.bodyAsText(), "Shop name is required")
     }
 }

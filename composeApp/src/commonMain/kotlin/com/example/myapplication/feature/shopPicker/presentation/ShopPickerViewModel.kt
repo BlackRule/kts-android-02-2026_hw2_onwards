@@ -2,6 +2,8 @@ package com.example.myapplication.feature.shopPicker.presentation
 
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.DEFAULT_SHOPS_PAGE_SIZE
+import com.example.myapplication.core.location.GeoPoint
+import com.example.myapplication.feature.shopPicker.model.ShopItem
 import com.example.myapplication.feature.shopPicker.model.ShopsPage
 import com.example.myapplication.feature.shopPicker.repository.ShopsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +38,7 @@ class ShopPickerViewModel(
 
     private var activeQuery: String = ""
     private var loadMoreJob: Job? = null
+    private var userLocation: GeoPoint? = null
 
     init {
         observeSearchRequests()
@@ -48,6 +51,17 @@ class ShopPickerViewModel(
 
     fun retry() {
         refreshRequests.tryEmit(_state.value.query.trim())
+    }
+
+    fun onUserLocationChanged(location: GeoPoint) {
+        userLocation = location
+        _state.update { state ->
+            val presentation = arrangeShops(state.shops)
+            state.copy(
+                shops = presentation.shops,
+                closestShopId = presentation.closestShopId,
+            )
+        }
     }
 
     fun onLoadNextPage() {
@@ -69,8 +83,10 @@ class ShopPickerViewModel(
             if (result.isSuccess) {
                 val nextPage = result.getOrThrow()
                 _state.update { state ->
+                    val presentation = arrangeShops(state.shops + nextPage.shops)
                     state.copy(
-                        shops = state.shops + nextPage.shops,
+                        shops = presentation.shops,
+                        closestShopId = presentation.closestShopId,
                         isLoadingNextPage = false,
                         paginationError = null,
                         currentPage = nextPage.page,
@@ -107,6 +123,7 @@ class ShopPickerViewModel(
                             paginationError = null,
                             isLoadingNextPage = false,
                             shops = emptyList(),
+                            closestShopId = null,
                             currentPage = 0,
                             hasNextPage = false,
                         )
@@ -140,8 +157,10 @@ class ShopPickerViewModel(
         if (result.isSuccess) {
             val page = result.getOrThrow()
             _state.update {
+                val presentation = arrangeShops(page.shops)
                 it.copy(
-                    shops = page.shops,
+                    shops = presentation.shops,
+                    closestShopId = presentation.closestShopId,
                     isLoading = false,
                     errorMessage = null,
                     currentPage = page.page,
@@ -154,6 +173,7 @@ class ShopPickerViewModel(
             _state.update {
                 it.copy(
                     shops = emptyList(),
+                    closestShopId = null,
                     isLoading = false,
                     errorMessage = result.exceptionOrNull()?.message,
                     currentPage = 0,
@@ -171,8 +191,79 @@ class ShopPickerViewModel(
         super.onCleared()
     }
 
+    private fun arrangeShops(shops: List<ShopItem>): ShopPresentation {
+        val location = userLocation ?: return ShopPresentation(
+            shops = shops,
+            closestShopId = null,
+        )
+
+        val closestShopIndex = shops.indices.minByOrNull { index ->
+            shops[index].distanceTo(location) ?: Double.MAX_VALUE
+        } ?: return ShopPresentation(
+            shops = shops,
+            closestShopId = null,
+        )
+
+        val closestShop = shops.getOrNull(closestShopIndex)
+            ?.takeIf { it.distanceTo(location) != null }
+            ?: return ShopPresentation(
+                shops = shops,
+                closestShopId = null,
+            )
+
+        return ShopPresentation(
+            shops = buildList {
+                add(closestShop)
+                shops.forEachIndexed { index, shop ->
+                    if (index != closestShopIndex) {
+                        add(shop)
+                    }
+                }
+            },
+            closestShopId = closestShop.id,
+        )
+    }
+
     private companion object {
         private const val FIRST_PAGE = 1
         private const val SEARCH_DEBOUNCE_MILLIS = 400L
     }
 }
+
+private data class ShopPresentation(
+    val shops: List<ShopItem>,
+    val closestShopId: Long?,
+)
+
+private fun ShopItem.distanceTo(location: GeoPoint): Double? {
+    val shopLat = lat ?: return null
+    val shopLon = lon ?: return null
+    return haversineDistanceMeters(
+        startLatitude = location.latitude,
+        startLongitude = location.longitude,
+        endLatitude = shopLat,
+        endLongitude = shopLon,
+    )
+}
+
+private fun haversineDistanceMeters(
+    startLatitude: Double,
+    startLongitude: Double,
+    endLatitude: Double,
+    endLongitude: Double,
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+    val latitudeDelta = (endLatitude - startLatitude).toRadians()
+    val longitudeDelta = (endLongitude - startLongitude).toRadians()
+    val startLatitudeRadians = startLatitude.toRadians()
+    val endLatitudeRadians = endLatitude.toRadians()
+
+    val a = kotlin.math.sin(latitudeDelta / 2).let { it * it } +
+        kotlin.math.cos(startLatitudeRadians) *
+        kotlin.math.cos(endLatitudeRadians) *
+        kotlin.math.sin(longitudeDelta / 2).let { it * it }
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    return earthRadiusMeters * c
+}
+
+private fun Double.toRadians(): Double = this * kotlin.math.PI / 180.0

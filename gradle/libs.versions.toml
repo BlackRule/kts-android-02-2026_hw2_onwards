@@ -19,6 +19,7 @@ navigationCompose = "2.9.2"
 coil = "3.3.0"
 postgresql = "42.7.7"
 napier = "2.7.1"
+yandexMapKit = "4.30.0-lite"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -53,6 +54,7 @@ ktor-serverContentNegotiation = { module = "io.ktor:ktor-server-content-negotiat
 ktor-serializationKotlinxJson = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
 ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+yandex-mapkit-lite = { module = "com.yandex.android:maps.mobile", version.ref = "yandexMapKit" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
