@@ -13,16 +13,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.common.ui.theme.AppTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.login_email_label
@@ -32,13 +32,23 @@ import myapplication.composeapp.generated.resources.login_password_placeholder
 import myapplication.composeapp.generated.resources.login_sign_in_button
 import myapplication.composeapp.generated.resources.login_title
 import org.jetbrains.compose.resources.stringResource
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun LoginScreen(
+    onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: LoginViewModel = viewModel(),
 ) {
-    var login by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                LoginUiEvent.LoginSuccessEvent -> onLoginSuccess()
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -52,20 +62,20 @@ fun LoginScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         TextField(
-            value = login,
-            onValueChange = { login = it },
+            value = state.username,
+            onValueChange = viewModel::onUsernameChanged,
             label = { Text(text = stringResource(Res.string.login_email_label)) },
             placeholder = { Text(text = stringResource(Res.string.login_email_placeholder)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next,
             ),
             modifier = Modifier.fillMaxWidth(),
         )
         TextField(
-            value = password,
-            onValueChange = { password = it },
+            value = state.password,
+            onValueChange = viewModel::onPasswordChanged,
             label = { Text(text = stringResource(Res.string.login_password_label)) },
             placeholder = { Text(text = stringResource(Res.string.login_password_placeholder)) },
             singleLine = true,
@@ -76,9 +86,17 @@ fun LoginScreen(
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
+        state.error?.let { errorText ->
+            Text(
+                text = errorText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Spacer(modifier = Modifier.weight(1f))
         Button(
-            onClick = { },
+            enabled = state.isLoginButtonActive,
+            onClick = viewModel::onLoginClicked,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(text = stringResource(Res.string.login_sign_in_button))
@@ -90,6 +108,8 @@ fun LoginScreen(
 @Composable
 private fun LoginScreenPreview() {
     AppTheme {
-        LoginScreen()
+        LoginScreen(
+            onLoginSuccess = {}
+        )
     }
 }
