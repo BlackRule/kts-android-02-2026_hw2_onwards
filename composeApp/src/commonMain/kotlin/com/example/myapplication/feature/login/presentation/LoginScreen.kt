@@ -13,8 +13,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,6 +32,7 @@ import myapplication.composeapp.generated.resources.login_password_placeholder
 import myapplication.composeapp.generated.resources.login_sign_in_button
 import myapplication.composeapp.generated.resources.login_title
 import org.jetbrains.compose.resources.stringResource
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun LoginScreen(
@@ -39,6 +41,15 @@ fun LoginScreen(
     viewModel: LoginViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                LoginUiEvent.LoginSuccessEvent -> onLoginSuccess()
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -85,11 +96,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.weight(1f))
         Button(
             enabled = state.isLoginButtonActive,
-            onClick = {
-                if (viewModel.onLoginClicked()) {
-                    onLoginSuccess()
-                }
-            },
+            onClick = viewModel::onLoginClicked,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(text = stringResource(Res.string.login_sign_in_button))

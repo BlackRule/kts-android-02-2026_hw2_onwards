@@ -2,8 +2,11 @@ package com.example.myapplication.feature.login.presentation
 
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.feature.login.repository.LoginRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -13,6 +16,9 @@ class LoginViewModel(
 
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
+
+    private val _events = MutableSharedFlow<LoginUiEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<LoginUiEvent> = _events.asSharedFlow()
 
     fun onUsernameChanged(username: String) {
         _state.update { currentState ->
@@ -38,7 +44,7 @@ class LoginViewModel(
         }
     }
 
-    fun onLoginClicked(): Boolean {
+    fun onLoginClicked() {
         val currentState = _state.value
         val result = loginRepository.login(
             username = currentState.username,
@@ -47,7 +53,7 @@ class LoginViewModel(
 
         if (result.isSuccess) {
             _state.update { it.copy(error = null) }
-            return true
+            _events.tryEmit(LoginUiEvent.LoginSuccessEvent)
         } else {
             _state.update {
                 it.copy(
@@ -55,7 +61,6 @@ class LoginViewModel(
                 )
             }
         }
-        return false
     }
 
     private fun isLoginButtonActive(
