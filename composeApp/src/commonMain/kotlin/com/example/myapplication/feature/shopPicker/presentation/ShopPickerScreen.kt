@@ -51,6 +51,8 @@ import myapplication.composeapp.generated.resources.shop_picker_location_unavail
 import myapplication.composeapp.generated.resources.shop_picker_retry_button
 import myapplication.composeapp.generated.resources.shop_picker_search_label
 import myapplication.composeapp.generated.resources.shop_picker_search_placeholder
+import myapplication.composeapp.generated.resources.shop_picker_select_button
+import myapplication.composeapp.generated.resources.shop_picker_selection_hint
 import myapplication.composeapp.generated.resources.shop_picker_title
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,6 +60,7 @@ import org.jetbrains.compose.resources.stringResource
 expect fun ShopPickerScreen(
     initialQuery: String,
     onAddNewShop: () -> Unit,
+    onShopSelected: ((ShopItem) -> Unit)?,
     modifier: Modifier = Modifier,
 )
 
@@ -77,6 +80,7 @@ internal fun ShopPickerContent(
     isResolvingLocation: Boolean,
     onRequestLocation: () -> Unit,
     onAddNewShop: () -> Unit,
+    onShopSelected: ((ShopItem) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -113,6 +117,13 @@ internal fun ShopPickerContent(
             text = stringResource(Res.string.shop_picker_title),
             style = MaterialTheme.typography.headlineMedium,
         )
+        if (onShopSelected != null) {
+            Text(
+                text = stringResource(Res.string.shop_picker_selection_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         OutlinedTextField(
             value = state.query,
             onValueChange = onSearchQueryChanged,
@@ -172,6 +183,9 @@ internal fun ShopPickerContent(
                         ShopCard(
                             shop = shop,
                             isClosest = shop.id == state.closestShopId,
+                            onSelectShop = onShopSelected
+                                ?.takeIf { shop.enabled }
+                                ?.let { { it(shop) } },
                         )
                     }
 
@@ -199,6 +213,7 @@ internal fun ShopPickerContent(
 private fun ShopCard(
     shop: ShopItem,
     isClosest: Boolean,
+    onSelectShop: (() -> Unit)?,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -247,6 +262,16 @@ private fun ShopCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+            onSelectShop?.let {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = it) {
+                        Text(text = stringResource(Res.string.shop_picker_select_button))
+                    }
+                }
             }
         }
     }
@@ -431,6 +456,7 @@ private fun ShopPickerScreenPreview() {
             isResolvingLocation = false,
             onRequestLocation = {},
             onAddNewShop = {},
+            onShopSelected = null,
         )
     }
 }

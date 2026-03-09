@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 
 @Composable
 expect fun CreateShopScreen(
+    returnToSelectionMode: Boolean,
     onBack: () -> Unit,
     onShopCreated: (String) -> Unit,
     modifier: Modifier = Modifier,

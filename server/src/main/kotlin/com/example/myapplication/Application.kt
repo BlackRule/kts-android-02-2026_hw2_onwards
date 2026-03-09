@@ -5,17 +5,24 @@ import com.example.myapplication.server.api.CreateShopRequest
 import com.example.myapplication.server.api.LoginRequest
 import com.example.myapplication.server.api.LoginResponse
 import com.example.myapplication.server.api.ShopResponse
+import com.example.myapplication.server.api.ShoppingListResponse
+import com.example.myapplication.server.api.ShoppingListsListResponse
 import com.example.myapplication.server.api.ShopsListResponse
+import com.example.myapplication.server.api.UpsertShoppingListRequest
 import com.example.myapplication.server.api.UserResponse
 import com.example.myapplication.server.api.UsersListResponse
 import com.example.myapplication.server.data.DatabaseFactory
 import com.example.myapplication.server.repository.CreateShopEntity
-import com.example.myapplication.server.repository.JsonShopsRepository
+import com.example.myapplication.server.repository.JsonShoppingListsRepository
 import com.example.myapplication.server.repository.LoginRepository
 import com.example.myapplication.server.repository.PostgresLoginRepository
+import com.example.myapplication.server.repository.PostgresShopsRepository
 import com.example.myapplication.server.repository.PostgresUsersRepository
 import com.example.myapplication.server.repository.ShopEntity
+import com.example.myapplication.server.repository.ShoppingListWithShopEntity
+import com.example.myapplication.server.repository.ShoppingListsRepository
 import com.example.myapplication.server.repository.ShopsRepository
+import com.example.myapplication.server.repository.UpsertShoppingListEntity
 import com.example.myapplication.server.repository.UsersRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
@@ -142,7 +149,8 @@ fun Application.module(
     initializeDatabase: Boolean = true,
     loginRepository: LoginRepository = PostgresLoginRepository(),
     usersRepository: UsersRepository = PostgresUsersRepository(),
-    shopsRepository: ShopsRepository = JsonShopsRepository(),
+    shopsRepository: ShopsRepository = PostgresShopsRepository(),
+    shoppingListsRepository: ShoppingListsRepository = JsonShoppingListsRepository(shopsRepository = shopsRepository),
 ) {
     install(ContentNegotiation) {
         json()
@@ -219,6 +227,139 @@ fun Application.module(
             }
         }
 
+        suspend fun ApplicationCall.respondWithShoppingLists() {
+            val shoppingListsResult = shoppingListsRepository.getList()
+
+            if (shoppingListsResult.isSuccess) {
+                respond(
+                    status = HttpStatusCode.OK,
+                    message = ShoppingListsListResponse(
+                        shoppingLists = shoppingListsResult.getOrThrow().map { it.toResponse() },
+                    ),
+                )
+            } else {
+                val exception = shoppingListsResult.exceptionOrNull()
+                respond(
+                    status = HttpStatusCode.InternalServerError,
+                    message = ErrorResponse(exception?.message ?: "Unable to load shopping lists"),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithShoppingList(id: Long) {
+            val shoppingListResult = shoppingListsRepository.getById(id)
+
+            if (shoppingListResult.isFailure) {
+                val exception = shoppingListResult.exceptionOrNull()
+                respond(
+                    status = HttpStatusCode.InternalServerError,
+                    message = ErrorResponse(exception?.message ?: "Unable to load shopping list"),
+                )
+                return
+            }
+
+            val shoppingList = shoppingListResult.getOrThrow()
+            if (shoppingList == null) {
+                respond(
+                    status = HttpStatusCode.NotFound,
+                    message = ErrorResponse("Shopping list not found"),
+                )
+            } else {
+                respond(
+                    status = HttpStatusCode.OK,
+                    message = shoppingList.toResponse(),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithCreatedShoppingList() {
+            val request = receive<UpsertShoppingListRequest>()
+            val createResult = shoppingListsRepository.create(
+                UpsertShoppingListEntity(
+                    shopId = request.shopId,
+                    paidAt = request.paidAt,
+                    totalAmountMinor = request.totalAmountMinor,
+                ),
+            )
+
+            if (createResult.isSuccess) {
+                respond(
+                    status = HttpStatusCode.Created,
+                    message = createResult.getOrThrow().toResponse(),
+                )
+            } else {
+                val exception = createResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to create shopping list"),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithUpdatedShoppingList(id: Long) {
+            val request = receive<UpsertShoppingListRequest>()
+            val updateResult = shoppingListsRepository.update(
+                id = id,
+                shoppingList = UpsertShoppingListEntity(
+                    shopId = request.shopId,
+                    paidAt = request.paidAt,
+                    totalAmountMinor = request.totalAmountMinor,
+                ),
+            )
+
+            if (updateResult.isFailure) {
+                val exception = updateResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to update shopping list"),
+                )
+                return
+            }
+
+            val updatedShoppingList = updateResult.getOrThrow()
+            if (updatedShoppingList == null) {
+                respond(
+                    status = HttpStatusCode.NotFound,
+                    message = ErrorResponse("Shopping list not found"),
+                )
+            } else {
+                respond(
+                    status = HttpStatusCode.OK,
+                    message = updatedShoppingList.toResponse(),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithDeletedShoppingList(id: Long) {
+            val deleteResult = shoppingListsRepository.delete(id)
+
+            if (deleteResult.isFailure) {
+                val exception = deleteResult.exceptionOrNull()
+                respond(
+                    status = HttpStatusCode.InternalServerError,
+                    message = ErrorResponse(exception?.message ?: "Unable to delete shopping list"),
+                )
+                return
+            }
+
+            if (deleteResult.getOrThrow()) {
+                respond(status = HttpStatusCode.NoContent, message = "")
+            } else {
+                respond(
+                    status = HttpStatusCode.NotFound,
+                    message = ErrorResponse("Shopping list not found"),
+                )
+            }
+        }
+
         get("/") {
             call.respondText("Server is running")
         }
@@ -287,6 +428,50 @@ fun Application.module(
         post("/stores") {
             call.respondWithCreatedShop()
         }
+
+        get("/shopping-lists") {
+            call.respondWithShoppingLists()
+        }
+
+        get("/shopping-lists/{shoppingListId}") {
+            val shoppingListId = call.parameters["shoppingListId"]?.toLongOrNull()
+            if (shoppingListId == null) {
+                call.respond(
+                    status = HttpStatusCode.BadRequest,
+                    message = ErrorResponse("Invalid shopping list id"),
+                )
+            } else {
+                call.respondWithShoppingList(shoppingListId)
+            }
+        }
+
+        post("/shopping-lists") {
+            call.respondWithCreatedShoppingList()
+        }
+
+        put("/shopping-lists/{shoppingListId}") {
+            val shoppingListId = call.parameters["shoppingListId"]?.toLongOrNull()
+            if (shoppingListId == null) {
+                call.respond(
+                    status = HttpStatusCode.BadRequest,
+                    message = ErrorResponse("Invalid shopping list id"),
+                )
+            } else {
+                call.respondWithUpdatedShoppingList(shoppingListId)
+            }
+        }
+
+        delete("/shopping-lists/{shoppingListId}") {
+            val shoppingListId = call.parameters["shoppingListId"]?.toLongOrNull()
+            if (shoppingListId == null) {
+                call.respond(
+                    status = HttpStatusCode.BadRequest,
+                    message = ErrorResponse("Invalid shopping list id"),
+                )
+            } else {
+                call.respondWithDeletedShoppingList(shoppingListId)
+            }
+        }
     }
 }
 
@@ -301,5 +486,14 @@ private fun ShopEntity.toResponse(): ShopResponse {
         lon = lon,
         address = address,
         enabled = enabled,
+    )
+}
+
+private fun ShoppingListWithShopEntity.toResponse(): ShoppingListResponse {
+    return ShoppingListResponse(
+        id = id,
+        shop = shop.toResponse(),
+        paidAt = paidAt,
+        totalAmountMinor = totalAmountMinor,
     )
 }
