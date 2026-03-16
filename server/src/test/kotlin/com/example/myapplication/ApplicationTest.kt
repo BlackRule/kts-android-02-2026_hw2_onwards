@@ -1,13 +1,23 @@
 package com.example.myapplication
 
 import com.example.myapplication.server.repository.CreateShopEntity
+import com.example.myapplication.server.repository.CreateCatalogItemEntity
+import com.example.myapplication.server.repository.CatalogItemEntity
+import com.example.myapplication.server.repository.HighlightRangeEntity
+import com.example.myapplication.server.repository.ItemCatalogService
+import com.example.myapplication.server.repository.ItemLookupEntity
+import com.example.myapplication.server.repository.ItemLookupMatchEntity
 import com.example.myapplication.server.repository.LoginRepository
+import com.example.myapplication.server.repository.PriceObservationImportResultEntity
+import com.example.myapplication.server.repository.PriceObservationImportRowEntity
 import com.example.myapplication.server.repository.ShopEntity
 import com.example.myapplication.server.repository.ShoppingListEntity
 import com.example.myapplication.server.repository.ShoppingListWithShopEntity
 import com.example.myapplication.server.repository.ShoppingListsRepository
 import com.example.myapplication.server.repository.ShopsPageEntity
 import com.example.myapplication.server.repository.ShopsRepository
+import com.example.myapplication.server.repository.RetailerPriceEntity
+import com.example.myapplication.server.repository.UnitCode
 import com.example.myapplication.server.repository.UpsertShoppingListEntity
 import com.example.myapplication.server.repository.UserEntity
 import com.example.myapplication.server.repository.UsersRepository
@@ -100,8 +110,8 @@ class ApplicationTest {
             } else {
                 shops.filter { shop ->
                     shop.name.contains(query, ignoreCase = true) ||
-                        shop.city.contains(query, ignoreCase = true) ||
-                        shop.address.contains(query, ignoreCase = true)
+                        shop.city?.contains(query, ignoreCase = true) == true ||
+                        shop.address?.contains(query, ignoreCase = true) == true
                 }
             }
             val fromIndex = ((page - 1) * pageSize).coerceAtMost(filtered.size)
@@ -170,35 +180,39 @@ class ApplicationTest {
         }
 
         override fun create(shoppingList: UpsertShoppingListEntity): Result<ShoppingListWithShopEntity> {
-            val validatedShoppingList = validate(shoppingList)
-            val createdShoppingList = ShoppingListEntity(
-                id = (shoppingLists.maxOfOrNull { it.id } ?: 0L) + 1L,
-                shopId = validatedShoppingList.shopId,
-                paidAt = validatedShoppingList.paidAt,
-                totalAmountMinor = validatedShoppingList.totalAmountMinor,
-            )
-            shoppingLists.add(createdShoppingList)
-            return Result.success(toWithShop(createdShoppingList))
+            return runCatching {
+                val validatedShoppingList = validate(shoppingList)
+                val createdShoppingList = ShoppingListEntity(
+                    id = (shoppingLists.maxOfOrNull { it.id } ?: 0L) + 1L,
+                    shopId = validatedShoppingList.shopId,
+                    paidAt = validatedShoppingList.paidAt,
+                    totalAmountMinor = validatedShoppingList.totalAmountMinor,
+                )
+                shoppingLists.add(createdShoppingList)
+                toWithShop(createdShoppingList)
+            }
         }
 
         override fun update(
             id: Long,
             shoppingList: UpsertShoppingListEntity,
         ): Result<ShoppingListWithShopEntity?> {
-            val validatedShoppingList = validate(shoppingList)
-            val shoppingListIndex = shoppingLists.indexOfFirst { it.id == id }
-            if (shoppingListIndex == -1) {
-                return Result.success(null)
+            return runCatching {
+                val validatedShoppingList = validate(shoppingList)
+                val shoppingListIndex = shoppingLists.indexOfFirst { it.id == id }
+                if (shoppingListIndex == -1) {
+                    null
+                } else {
+                    val updatedShoppingList = ShoppingListEntity(
+                        id = id,
+                        shopId = validatedShoppingList.shopId,
+                        paidAt = validatedShoppingList.paidAt,
+                        totalAmountMinor = validatedShoppingList.totalAmountMinor,
+                    )
+                    shoppingLists[shoppingListIndex] = updatedShoppingList
+                    toWithShop(updatedShoppingList)
+                }
             }
-
-            val updatedShoppingList = ShoppingListEntity(
-                id = id,
-                shopId = validatedShoppingList.shopId,
-                paidAt = validatedShoppingList.paidAt,
-                totalAmountMinor = validatedShoppingList.totalAmountMinor,
-            )
-            shoppingLists[shoppingListIndex] = updatedShoppingList
-            return Result.success(toWithShop(updatedShoppingList))
         }
 
         override fun delete(id: Long): Result<Boolean> {
@@ -240,6 +254,101 @@ class ApplicationTest {
                 shop = shop,
                 paidAt = shoppingList.paidAt,
                 totalAmountMinor = shoppingList.totalAmountMinor,
+            )
+        }
+    }
+
+    private val fakeItemCatalogService = object : ItemCatalogService {
+        private val items = linkedMapOf(
+            "111111" to CatalogItemEntity(
+                barcode = "111111",
+                mainName = "Apple Juice",
+                names = listOf("Apple Juice", "AJ"),
+                unit = UnitCode.PIECE,
+            ),
+            "222222" to CatalogItemEntity(
+                barcode = "222222",
+                mainName = "Apple Jam",
+                names = listOf("Apple Jam", "Jam"),
+                unit = UnitCode.PIECE,
+            ),
+        )
+        private val importedRows = linkedSetOf<String>()
+        var lastLookupSoldByWeight: Boolean? = null
+
+        override fun lookup(
+            query: String,
+            soldByWeight: Boolean,
+        ): Result<ItemLookupEntity> {
+            lastLookupSoldByWeight = soldByWeight
+            return Result.success(
+                when (query.trim()) {
+                    "111111" -> ItemLookupEntity.Single(
+                        item = items.getValue("111111"),
+                        normalizedBarcode = "111111",
+                        retailerPrice = RetailerPriceEntity(
+                            unit = UnitCode.PIECE,
+                            price = "12.00",
+                            discountPercent = "0.00",
+                            finalPrice = "12.00",
+                        ),
+                    )
+
+                    "apple" -> ItemLookupEntity.Multiple(
+                        matches = listOf(
+                            ItemLookupMatchEntity(
+                                item = items.getValue("111111"),
+                                matchedName = "Apple Juice",
+                                highlightRanges = listOf(HighlightRangeEntity(0, 5)),
+                            ),
+                            ItemLookupMatchEntity(
+                                item = items.getValue("222222"),
+                                matchedName = "Apple Jam",
+                                highlightRanges = listOf(HighlightRangeEntity(0, 5)),
+                            ),
+                        ),
+                    )
+
+                    else -> ItemLookupEntity.Create(
+                        normalizedBarcode = query.trim(),
+                        suggestedNames = listOf("Created Name"),
+                        suggestedUnit = UnitCode.PIECE,
+                    )
+                },
+            )
+        }
+
+        override fun createItem(item: CreateCatalogItemEntity): Result<CatalogItemEntity> {
+            val created = CatalogItemEntity(
+                barcode = item.barcode,
+                mainName = item.mainName,
+                names = listOf(item.mainName) + item.aliasNames,
+                unit = item.unit,
+            )
+            items[item.barcode] = created
+            return Result.success(created)
+        }
+
+        override fun importPriceObservations(
+            shopId: Long,
+            paymentTime: String,
+            rows: List<PriceObservationImportRowEntity>,
+        ): Result<PriceObservationImportResultEntity> {
+            var inserted = 0
+            var skipped = 0
+            rows.forEach { row ->
+                val key = listOf(shopId, row.itemBarcode, row.price, row.finalPrice).joinToString("|")
+                if (importedRows.add(key)) {
+                    inserted += 1
+                } else {
+                    skipped += 1
+                }
+            }
+            return Result.success(
+                PriceObservationImportResultEntity(
+                    insertedCount = inserted,
+                    skippedCount = skipped,
+                ),
             )
         }
     }
@@ -458,6 +567,111 @@ class ApplicationTest {
 
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertContains(response.bodyAsText(), "Shopping list total must be zero or greater")
+    }
+
+    @Test
+    fun testItemLookupSupportsMultipleMatches() = testApplication {
+        application {
+            module(
+                initializeDatabase = false,
+                loginRepository = fakeLoginRepository,
+                usersRepository = fakeUsersRepository,
+                shopsRepository = fakeShopsRepository,
+                shoppingListsRepository = fakeShoppingListsRepository,
+                itemCatalogService = fakeItemCatalogService,
+            )
+        }
+
+        val response = client.post("/items/lookup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"query":"apple"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertContains(response.bodyAsText(), "\"kind\":\"multiple_matches\"")
+        assertContains(response.bodyAsText(), "\"matchedName\":\"Apple Juice\"")
+    }
+
+    @Test
+    fun testItemLookupPassesSoldByWeightFlag() = testApplication {
+        application {
+            module(
+                initializeDatabase = false,
+                loginRepository = fakeLoginRepository,
+                usersRepository = fakeUsersRepository,
+                shopsRepository = fakeShopsRepository,
+                shoppingListsRepository = fakeShoppingListsRepository,
+                itemCatalogService = fakeItemCatalogService,
+            )
+        }
+
+        val response = client.post("/items/lookup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"query":"2501234567890","soldByWeight":true}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(true, fakeItemCatalogService.lastLookupSoldByWeight)
+    }
+
+    @Test
+    fun testItemCreateAndPriceImportAreIdempotent() = testApplication {
+        application {
+            module(
+                initializeDatabase = false,
+                loginRepository = fakeLoginRepository,
+                usersRepository = fakeUsersRepository,
+                shopsRepository = fakeShopsRepository,
+                shoppingListsRepository = fakeShoppingListsRepository,
+                itemCatalogService = fakeItemCatalogService,
+            )
+        }
+
+        val createResponse = client.post("/items") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "barcode":"333333",
+                  "mainName":"Milk",
+                  "aliasNames":["Milk","Whole Milk"],
+                  "unit":"PIECE"
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HttpStatusCode.Created, createResponse.status)
+        assertContains(createResponse.bodyAsText(), "\"barcode\":\"333333\"")
+
+        val importBody = """
+            {
+              "shopId":60,
+              "paymentTime":"2026-03-10 18:20",
+              "rows":[
+                {
+                  "itemBarcode":"333333",
+                  "price":"12.00",
+                  "discountPercent":"0.00",
+                  "finalPrice":"12.00"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val firstImport = client.post("/price-observations/import") {
+            contentType(ContentType.Application.Json)
+            setBody(importBody)
+        }
+        val secondImport = client.post("/price-observations/import") {
+            contentType(ContentType.Application.Json)
+            setBody(importBody)
+        }
+
+        assertEquals(HttpStatusCode.OK, firstImport.status)
+        assertContains(firstImport.bodyAsText(), "\"insertedCount\":1")
+        assertEquals(HttpStatusCode.OK, secondImport.status)
+        assertContains(secondImport.bodyAsText(), "\"skippedCount\":1")
     }
 
     private companion object {

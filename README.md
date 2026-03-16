@@ -14,6 +14,57 @@
 * ну и список магазинов будет на сервере. хочу позаимствовать попробовать с местных сетевых магазинов как и получение цены по их API . цель - человеку как можно меньше водить вручную. 
 * Ну и модератором сам постараюсь быть 🙈
 
+## Secrets submodule
+
+Секреты теперь предполагаются вне публичного репозитория, в приватном Git submodule `secrets/`.
+
+Используемые файлы:
+
+- `secrets/android/local.properties`
+- `secrets/server/external-apis.properties`
+
+`composeApp` читает `SERVER_BASE_URL` и `MAPKIT_API_KEY` сначала из `secrets/android/local.properties`, потом из обычного `local.properties` / Gradle properties.
+
+Сервер читает внешние API-настройки сначала из `secrets/server/external-apis.properties`, потом из переменных окружения:
+
+- `PRICE_LOOKUP_BASE_URL`
+- `PRICE_LOOKUP_SESSION_QUERY`
+- `BARCODE_LOOKUP_BASE_URL`
+- `BARCODE_LOOKUP_SECRET`
+
+Пример `secrets/android/local.properties`:
+
+```properties
+SERVER_BASE_URL=https://195.46.171.236:9878
+MAPKIT_API_KEY=your-mapkit-key
+```
+
+Пример `secrets/server/external-apis.properties`:
+
+```properties
+PRICE_LOOKUP_BASE_URL=https://example.com/api/v1/price/71
+PRICE_LOOKUP_SESSION_QUERY=&session_id=...&user_id=...
+BARCODE_LOOKUP_BASE_URL=https://barcodes.olegon.ru/api/card/name
+BARCODE_LOOKUP_SECRET=your-secret
+```
+
+### GitHub setup
+
+1. Создай приватный репозиторий, например `pokupan-secrets`.
+2. Внутри него положи нужные файлы `android/local.properties` и `server/external-apis.properties`.
+3. В основном репозитории добавь submodule:
+
+```bash
+git submodule add git@github.com:<your-account>/pokupan-secrets.git secrets
+git commit -m "Add private secrets submodule"
+```
+
+4. После клона проекта инициализируй submodule:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## HTTPS
 
 Android 9+ блокирует `http://` по умолчанию, поэтому клиент и сервер теперь надо поднимать через HTTPS.

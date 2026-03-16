@@ -13,71 +13,181 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.common.ui.asString
+import com.example.myapplication.common.ui.rememberPlatformMessageHandler
+import com.example.myapplication.common.ui.resolveString
+import com.example.myapplication.common.ui.theme.AppTheme
 import com.example.myapplication.common.ui.theme.Dimens
+import com.example.myapplication.feature.itemCatalog.model.UnitType
 import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.common_cancel_button
+import myapplication.composeapp.generated.resources.common_confirm_button
 import myapplication.composeapp.generated.resources.shopping_list_back_button
 import myapplication.composeapp.generated.resources.shopping_list_checkout_time_label
 import myapplication.composeapp.generated.resources.shopping_list_checkout_time_placeholder
 import myapplication.composeapp.generated.resources.shopping_list_clear_shop_button
+import myapplication.composeapp.generated.resources.common_inline_separator
+import myapplication.composeapp.generated.resources.shopping_list_paid_confirm_title
+import myapplication.composeapp.generated.resources.shopping_list_mark_as_paid_button
+import myapplication.composeapp.generated.resources.shopping_list_need_barcode_button
 import myapplication.composeapp.generated.resources.shopping_list_pick_time_button
 import myapplication.composeapp.generated.resources.shopping_list_row_amount_header
 import myapplication.composeapp.generated.resources.shopping_list_row_discount_header
 import myapplication.composeapp.generated.resources.shopping_list_row_final_price_header
 import myapplication.composeapp.generated.resources.shopping_list_row_item_header
 import myapplication.composeapp.generated.resources.shopping_list_row_price_header
-import myapplication.composeapp.generated.resources.shopping_list_table_hint
+import myapplication.composeapp.generated.resources.shopping_list_row_total_header
 import myapplication.composeapp.generated.resources.shopping_list_rows_add_button
 import myapplication.composeapp.generated.resources.shopping_list_save_button
 import myapplication.composeapp.generated.resources.shopping_list_saving_button
+import myapplication.composeapp.generated.resources.shopping_list_select_item_button
 import myapplication.composeapp.generated.resources.shopping_list_select_shop_button
 import myapplication.composeapp.generated.resources.shopping_list_selected_shop_label
+import myapplication.composeapp.generated.resources.shopping_list_table_hint
 import myapplication.composeapp.generated.resources.shopping_list_title_create
 import myapplication.composeapp.generated.resources.shopping_list_title_edit
 import myapplication.composeapp.generated.resources.shopping_list_total_label
 import myapplication.composeapp.generated.resources.shopping_list_total_placeholder
+import myapplication.composeapp.generated.resources.shopping_list_unresolved_item_label
 import myapplication.composeapp.generated.resources.shopping_list_use_current_time_button
 import org.jetbrains.compose.resources.stringResource
+import com.example.myapplication.feature.itemCatalog.model.labelResource
+import kotlinx.coroutines.flow.collect
 
 @Composable
-expect fun ShoppingListScreen(
+fun ShoppingListScreen(
     shoppingListId: Long?,
     selectedShopPayload: String?,
     onSelectedShopConsumed: () -> Unit,
     onBack: () -> Unit,
     onSelectShop: () -> Unit,
+    onOpenItemSelect: (ownerKey: Long, rowId: Long?) -> Unit,
+    onOpenNeedBarcode: () -> Unit,
     onSaved: () -> Unit,
     modifier: Modifier = Modifier,
-)
+) {
+    val viewModel = rememberShoppingListScreenController(shoppingListId)
+    val showMessage = rememberPlatformMessageHandler()
+    val paidAtPicker = rememberPaidAtPickerLauncher(viewModel::onPaidAtChanged)
+    val screenState by viewModel.state.collectAsState()
+
+    LaunchedEffect(selectedShopPayload, viewModel) {
+        if (selectedShopPayload != null) {
+            viewModel.onSelectedShopPayload(selectedShopPayload)
+            onSelectedShopConsumed()
+        }
+    }
+
+    LaunchedEffect(viewModel, showMessage, onOpenItemSelect, onOpenNeedBarcode, onSaved) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ShoppingListScreenEvent.OpenItemSelect -> {
+                    onOpenItemSelect(event.ownerKey, event.rowId)
+                }
+
+                ShoppingListScreenEvent.OpenNeedBarcode -> onOpenNeedBarcode()
+
+                is ShoppingListScreenEvent.ShowMessage -> {
+                    showMessage(event.message.resolveString())
+                }
+
+                ShoppingListScreenEvent.Saved -> onSaved()
+            }
+        }
+    }
+
+    ShoppingListContent(
+        state = screenState.effectiveFormState,
+        shoppingRows = screenState.rows,
+        unresolvedCount = screenState.unresolvedCount,
+        onBack = onBack,
+        onSelectShop = onSelectShop,
+        onClearShop = viewModel::clearSelectedShop,
+        onPaidAtChanged = viewModel::onPaidAtChanged,
+        onPickPaidAt = {
+            paidAtPicker(screenState.effectiveFormState.paidAtInput)
+        },
+        onUseCurrentTime = viewModel::useCurrentTime,
+        onAddRow = viewModel::onAddRowRequested,
+        onSelectRowItem = viewModel::onRowItemRequested,
+        onRowPriceChanged = viewModel::onRowPriceChanged,
+        onRowDiscountChanged = viewModel::onRowDiscountChanged,
+        onRowFinalPriceChanged = viewModel::onRowFinalPriceChanged,
+        onRowAmountChanged = viewModel::onRowAmountChanged,
+        onSave = viewModel::saveAndExit,
+        onMarkAsPaid = viewModel::requestMarkAsPaid,
+        onOpenNeedBarcode = onOpenNeedBarcode,
+        modifier = modifier,
+    )
+
+    if (screenState.showPaidConfirmation) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPaidConfirmation,
+            title = {
+                Text(
+                    text = stringResource(Res.string.shopping_list_paid_confirm_title),
+                )
+            },
+            text = {
+                screenState.paidConfirmationMessage?.let { message ->
+                    Text(text = message.asString())
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmMarkAsPaid) {
+                    Text(
+                        text = stringResource(Res.string.common_confirm_button),
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissPaidConfirmation) {
+                    Text(
+                        text = stringResource(Res.string.common_cancel_button),
+                    )
+                }
+            },
+        )
+    }
+}
 
 @Composable
 internal fun ShoppingListContent(
     state: ShoppingListUiState,
+    shoppingRows: List<ShoppingListEntryUiState>,
+    unresolvedCount: Int,
     onBack: () -> Unit,
     onSelectShop: () -> Unit,
     onClearShop: () -> Unit,
     onPaidAtChanged: (String) -> Unit,
     onPickPaidAt: () -> Unit,
     onUseCurrentTime: () -> Unit,
-    onTotalChanged: (String) -> Unit,
-    shoppingRows: List<ShoppingListEntryUiState>,
     onAddRow: () -> Unit,
-    onRowItemChanged: (Int, String) -> Unit,
+    onSelectRowItem: (Int) -> Unit,
     onRowPriceChanged: (Int, String) -> Unit,
     onRowDiscountChanged: (Int, String) -> Unit,
     onRowFinalPriceChanged: (Int, String) -> Unit,
     onRowAmountChanged: (Int, String) -> Unit,
     onSave: () -> Unit,
+    onMarkAsPaid: () -> Unit,
+    onOpenNeedBarcode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -197,11 +307,12 @@ internal fun ShoppingListContent(
         }
 
         OutlinedTextField(
-            value = state.totalInput,
-            onValueChange = onTotalChanged,
+            value = state.totalDisplay,
+            onValueChange = {},
             label = { Text(text = stringResource(Res.string.shopping_list_total_label)) },
             placeholder = { Text(text = stringResource(Res.string.shopping_list_total_placeholder)) },
             singleLine = true,
+            readOnly = true,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -223,7 +334,7 @@ internal fun ShoppingListContent(
                 shoppingRows.forEachIndexed { index, row ->
                     ShoppingTableRow(
                         row = row,
-                        onItemChanged = { onRowItemChanged(index, it) },
+                        onItemClick = { onSelectRowItem(index) },
                         onPriceChanged = { onRowPriceChanged(index, it) },
                         onDiscountChanged = { onRowDiscountChanged(index, it) },
                         onFinalPriceChanged = { onRowFinalPriceChanged(index, it) },
@@ -241,9 +352,27 @@ internal fun ShoppingListContent(
             Text(text = stringResource(Res.string.shopping_list_rows_add_button))
         }
 
+        if (unresolvedCount > 0) {
+            Button(
+                onClick = onOpenNeedBarcode,
+                enabled = !state.isSaving,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(Res.string.shopping_list_need_barcode_button))
+            }
+        }
+
+        Button(
+            onClick = onMarkAsPaid,
+            enabled = !state.isLoading && !state.isSaving,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = stringResource(Res.string.shopping_list_mark_as_paid_button))
+        }
+
         state.errorMessage?.let { errorMessage ->
             Text(
-                text = errorMessage,
+                text = errorMessage.asString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -265,12 +394,61 @@ internal fun ShoppingListContent(
     }
 }
 
+@Preview
+@Composable
+private fun ShoppingListContentPreview() {
+    AppTheme {
+        ShoppingListContent(
+            state = ShoppingListUiState(
+                selectedShop = com.example.myapplication.feature.shopPicker.model.ShopItem(
+                    id = 1L,
+                    name = "Fresh Market",
+                    city = "Kaliningrad",
+                    openingTime = "08:00",
+                    closingTime = "22:00",
+                    address = "12 River St",
+                    enabled = true,
+                ),
+                paidAtInput = "2026-03-14 18:45",
+                totalDisplay = "16.50",
+                isLoading = false,
+            ),
+            shoppingRows = listOf(
+                ShoppingListEntryUiState(
+                    localId = 1L,
+                    itemMainName = "Bananas",
+                    unit = UnitType.KG,
+                    finalPriceInput = "3.30",
+                    amountInput = "2",
+                    totalDisplay = "6.60",
+                ),
+            ),
+            unresolvedCount = 0,
+            onBack = {},
+            onSelectShop = {},
+            onClearShop = {},
+            onPaidAtChanged = {},
+            onPickPaidAt = {},
+            onUseCurrentTime = {},
+            onAddRow = {},
+            onSelectRowItem = {},
+            onRowPriceChanged = { _, _ -> },
+            onRowDiscountChanged = { _, _ -> },
+            onRowFinalPriceChanged = { _, _ -> },
+            onRowAmountChanged = { _, _ -> },
+            onSave = {},
+            onMarkAsPaid = {},
+            onOpenNeedBarcode = {},
+        )
+    }
+}
+
 @Composable
 private fun ShoppingTableHeader() {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TableHeaderCell(
             label = stringResource(Res.string.shopping_list_row_item_header),
-            width = 160.dp,
+            width = 200.dp,
         )
         TableHeaderCell(
             label = stringResource(Res.string.shopping_list_row_price_header),
@@ -288,23 +466,29 @@ private fun ShoppingTableHeader() {
             label = stringResource(Res.string.shopping_list_row_amount_header),
             width = 110.dp,
         )
+        TableHeaderCell(
+            label = stringResource(Res.string.shopping_list_row_total_header),
+            width = 110.dp,
+        )
     }
 }
 
 @Composable
 private fun ShoppingTableRow(
     row: ShoppingListEntryUiState,
-    onItemChanged: (String) -> Unit,
+    onItemClick: () -> Unit,
     onPriceChanged: (String) -> Unit,
     onDiscountChanged: (String) -> Unit,
     onFinalPriceChanged: (String) -> Unit,
     onAmountChanged: (String) -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TableInputCell(
-            value = row.item,
-            onValueChanged = onItemChanged,
-            width = 160.dp,
+        ItemCell(
+            name = row.itemMainName,
+            unit = row.unit,
+            isPending = row.pendingItemId != null || row.itemBarcode.isNullOrBlank(),
+            onClick = onItemClick,
+            width = 200.dp,
         )
         TableInputCell(
             value = row.priceInput,
@@ -324,6 +508,10 @@ private fun ShoppingTableRow(
         TableInputCell(
             value = row.amountInput,
             onValueChanged = onAmountChanged,
+            width = 110.dp,
+        )
+        TableValueCell(
+            value = row.totalDisplay,
             width = 110.dp,
         )
     }
@@ -355,4 +543,102 @@ private fun TableInputCell(
         singleLine = true,
         modifier = Modifier.width(width),
     )
+}
+
+@Composable
+private fun TableValueCell(
+    value: String,
+    width: Dp,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        singleLine = true,
+        modifier = Modifier.width(width),
+    )
+}
+
+@Composable
+private fun ItemCell(
+    name: String,
+    unit: UnitType?,
+    isPending: Boolean,
+    onClick: () -> Unit,
+    width: Dp,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.width(width),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = name.ifBlank { stringResource(Res.string.shopping_list_select_item_button) },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            val separator = stringResource(Res.string.common_inline_separator)
+            val subtitle = buildList {
+                unit?.let { add(stringResource(it.labelResource())) }
+                if (isPending) {
+                    add(stringResource(Res.string.shopping_list_unresolved_item_label))
+                }
+            }.joinToString(separator = separator)
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun ShoppingTableHeaderPreview() {
+    AppTheme {
+        ShoppingTableHeader()
+    }
+}
+
+@Preview
+@Composable
+private fun ShoppingTableRowPreview() {
+    AppTheme {
+        ShoppingTableRow(
+            row = ShoppingListEntryUiState(
+                localId = 1L,
+                itemMainName = "Bananas",
+                unit = UnitType.KG,
+                priceInput = "4.20",
+                discountPercentInput = "10",
+                finalPriceInput = "3.78",
+                amountInput = "2",
+                totalDisplay = "7.56",
+            ),
+            onItemClick = {},
+            onPriceChanged = {},
+            onDiscountChanged = {},
+            onFinalPriceChanged = {},
+            onAmountChanged = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun ItemCellPreview() {
+    AppTheme {
+        ItemCell(
+            name = "Bananas",
+            unit = UnitType.KG,
+            isPending = true,
+            onClick = {},
+            width = 200.dp,
+        )
+    }
 }

@@ -2,9 +2,11 @@ package com.example.myapplication.common.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
 
 private val LightColorScheme = lightColorScheme(
     primary = Primary,
@@ -61,4 +63,12 @@ fun AppTheme(
         colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         content = content,
     )
+}
+
+@Preview
+@Composable
+private fun AppThemePreview() {
+    AppTheme {
+        Text(text = "")
+    }
 }

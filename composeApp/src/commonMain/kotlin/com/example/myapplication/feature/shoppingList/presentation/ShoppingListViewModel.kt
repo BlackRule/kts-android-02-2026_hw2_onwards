@@ -1,8 +1,9 @@
 package com.example.myapplication.feature.shoppingList.presentation
 
 import androidx.lifecycle.ViewModel
+import com.example.myapplication.common.ui.UiText
+import com.example.myapplication.common.ui.toUiTextOr
 import com.example.myapplication.feature.shopPicker.model.ShopItem
-import com.example.myapplication.feature.shoppingLists.model.parseMoneyAmountToMinorUnits
 import com.example.myapplication.feature.shoppingLists.model.toMoneyAmountString
 import com.example.myapplication.feature.shoppingLists.repository.ShoppingListsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -14,12 +15,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.shopping_list_load_error
+import myapplication.composeapp.generated.resources.shopping_list_paid_at_error
+import myapplication.composeapp.generated.resources.shopping_list_save_error
+import myapplication.composeapp.generated.resources.shopping_list_select_shop_error
 
 class ShoppingListViewModel(
     private val shoppingListsRepository: ShoppingListsRepository = ShoppingListsRepository(),
 ) : ViewModel() {
 
-    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loadedShoppingListId: Long? = null
 
     private val _state = MutableStateFlow(ShoppingListUiState())
@@ -53,7 +59,7 @@ class ShoppingListViewModel(
                         shoppingListId = shoppingList.id,
                         selectedShop = shoppingList.shop,
                         paidAtInput = shoppingList.paidAt,
-                        totalInput = shoppingList.totalAmountMinor.toMoneyAmountString(),
+                        totalDisplay = shoppingList.totalAmountMinor.toMoneyAmountString(),
                         isLoading = false,
                         errorMessage = null,
                     )
@@ -62,7 +68,9 @@ class ShoppingListViewModel(
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "Unable to load shopping list",
+                        errorMessage = result.exceptionOrNull().toUiTextOr(
+                            fallback = Res.string.shopping_list_load_error,
+                        ),
                     )
                 }
             }
@@ -106,10 +114,10 @@ class ShoppingListViewModel(
         }
     }
 
-    fun onTotalChanged(total: String) {
+    fun onComputedTotalChanged(total: String) {
         _state.update {
             it.copy(
-                totalInput = total,
+                totalDisplay = total,
                 errorMessage = null,
             )
         }
@@ -119,7 +127,11 @@ class ShoppingListViewModel(
         _state.update { it.copy(saveSucceeded = false) }
     }
 
-    fun saveShoppingList() {
+    fun showMessage(message: UiText?) {
+        _state.update { it.copy(errorMessage = message) }
+    }
+
+    fun saveShoppingList(totalAmountMinor: Long) {
         val currentState = _state.value
         if (currentState.isLoading || currentState.isSaving) {
             return
@@ -127,19 +139,17 @@ class ShoppingListViewModel(
 
         val selectedShop = currentState.selectedShop
         if (selectedShop == null) {
-            _state.update { it.copy(errorMessage = "Select a shop first") }
+            _state.update {
+                it.copy(errorMessage = UiText.Resource(Res.string.shopping_list_select_shop_error))
+            }
             return
         }
 
         val paidAt = currentState.paidAtInput.trim()
         if (!paidAtPattern.matches(paidAt)) {
-            _state.update { it.copy(errorMessage = "Payment time must use yyyy-MM-dd HH:mm") }
-            return
-        }
-
-        val totalAmountMinor = parseMoneyAmountToMinorUnits(currentState.totalInput)
-        if (totalAmountMinor == null) {
-            _state.update { it.copy(errorMessage = "Enter a valid total amount") }
+            _state.update {
+                it.copy(errorMessage = UiText.Resource(Res.string.shopping_list_paid_at_error))
+            }
             return
         }
 
@@ -168,7 +178,7 @@ class ShoppingListViewModel(
                         shoppingListId = savedShoppingList.id,
                         selectedShop = savedShoppingList.shop,
                         paidAtInput = savedShoppingList.paidAt,
-                        totalInput = savedShoppingList.totalAmountMinor.toMoneyAmountString(),
+                        totalDisplay = savedShoppingList.totalAmountMinor.toMoneyAmountString(),
                         isSaving = false,
                         errorMessage = null,
                         saveSucceeded = true,
@@ -178,7 +188,9 @@ class ShoppingListViewModel(
                 _state.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "Unable to save shopping list",
+                        errorMessage = result.exceptionOrNull().toUiTextOr(
+                            fallback = Res.string.shopping_list_save_error,
+                        ),
                     )
                 }
             }

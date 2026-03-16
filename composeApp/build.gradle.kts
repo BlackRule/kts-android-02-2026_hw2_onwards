@@ -15,17 +15,22 @@ fun String.toBuildConfigString(): String {
 }
 
 fun readLocalProperty(name: String): String {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (!localPropertiesFile.isFile) {
-        return ""
+    val candidateFiles = listOf(
+        rootProject.file("secrets/android/local.properties"),
+        rootProject.file("local.properties"),
+    )
+
+    candidateFiles.firstOrNull { it.isFile }?.let { propertiesFile ->
+        val properties = Properties()
+        propertiesFile.inputStream().use(properties::load)
+        return properties.getProperty(name).orEmpty()
     }
 
-    val properties = Properties()
-    localPropertiesFile.inputStream().use(properties::load)
-    return properties.getProperty(name).orEmpty()
+    return ""
 }
 
 val serverBaseUrl = providers.gradleProperty("SERVER_BASE_URL")
+    .orElse(provider { readLocalProperty("SERVER_BASE_URL") })
     .orElse("https://195.46.171.236:9878")
     .map { value -> value.trim().removeSuffix("/") }
 
@@ -45,8 +50,13 @@ kotlin {
             implementation(libs.androidx.core.ktx)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.camera.core)
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
             implementation(libs.coil.network.okhttp)
             implementation(libs.ktor.clientOkHttp)
+            implementation(libs.mlkit.barcode.scanning)
             implementation(libs.yandex.mapkit.lite)
         }
         commonMain.dependencies {

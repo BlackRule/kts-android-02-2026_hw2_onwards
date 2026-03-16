@@ -1,6 +1,8 @@
 package com.example.myapplication.feature.shopCreation.presentation
 
 import androidx.lifecycle.ViewModel
+import com.example.myapplication.common.ui.UiText
+import com.example.myapplication.common.ui.toUiTextOr
 import com.example.myapplication.feature.shopCreation.model.NewShopDraft
 import com.example.myapplication.feature.shopPicker.repository.ShopsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -12,12 +14,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import myapplication.composeapp.generated.resources.Res
+import myapplication.composeapp.generated.resources.create_shop_location_required_error
+import myapplication.composeapp.generated.resources.create_shop_name_required_error
+import myapplication.composeapp.generated.resources.create_shop_save_error
 
 class CreateShopViewModel(
     private val shopsRepository: ShopsRepository = ShopsRepository(),
 ) : ViewModel() {
 
-    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val _state = MutableStateFlow(CreateShopUiState())
     val state: StateFlow<CreateShopUiState> = _state.asStateFlow()
@@ -70,13 +76,17 @@ class CreateShopViewModel(
 
         when {
             trimmedName.isEmpty() -> {
-                _state.update { it.copy(errorMessage = "Shop name is required") }
+                _state.update {
+                    it.copy(errorMessage = UiText.Resource(Res.string.create_shop_name_required_error))
+                }
                 return
             }
 
             currentState.latitude == null || currentState.longitude == null || currentState.address.isBlank() -> {
                 _state.update {
-                    it.copy(errorMessage = "Select a shop location from GPS or address search")
+                    it.copy(
+                        errorMessage = UiText.Resource(Res.string.create_shop_location_required_error),
+                    )
                 }
                 return
             }
@@ -109,7 +119,9 @@ class CreateShopViewModel(
                 _state.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "Unable to create shop",
+                        errorMessage = result.exceptionOrNull().toUiTextOr(
+                            fallback = Res.string.create_shop_save_error,
+                        ),
                     )
                 }
             }

@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: myapplication-postgres
     environment:
       POSTGRES_DB: myapplication
       POSTGRES_USER: myapp
@@ -20,12 +19,16 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
-    container_name: myapplication-server
+    env_file:
+      - ./secrets/server/external-apis.properties
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SERVER_PORT: ${SERVER_PORT:-9878}
+      SERVER_DEBUG_ENABLED: ${SERVER_DEBUG_ENABLED:-true}
+      SERVER_DEBUG_PORT: ${SERVER_DEBUG_PORT:-5005}
+      SERVER_DEBUG_SUSPEND: ${SERVER_DEBUG_SUSPEND:-n}
       DB_URL: jdbc:postgresql://postgres:5432/myapplication
       DB_USER: myapp
       DB_PASSWORD: myapp
@@ -53,9 +56,13 @@ services:
             export SSL_PRIVATE_KEY_PASSWORD="$${SSL_KEYSTORE_PASSWORD}"
           fi
         fi
+        if [ "$${SERVER_DEBUG_ENABLED}" = "true" ]; then
+          export JAVA_TOOL_OPTIONS="$${JAVA_TOOL_OPTIONS:+$${JAVA_TOOL_OPTIONS} }-agentlib:jdwp=transport=dt_socket,server=y,suspend=$${SERVER_DEBUG_SUSPEND:-n},address=*:$${SERVER_DEBUG_PORT:-5005}"
+        fi
         exec ./bin/server
     ports:
       - "${SERVER_PORT:-9878}:${SERVER_PORT:-9878}"
+      - "${SERVER_DEBUG_PORT:-5005}:${SERVER_DEBUG_PORT:-5005}"
 
   server-test:
     image: gradle:8.14.3-jdk17
@@ -71,6 +78,8 @@ services:
     image: gradle:8.14.3-jdk17
     profiles: ["testing"]
     working_dir: /workspace
+    env_file:
+      - ./secrets/server/external-apis.properties
     depends_on:
       postgres:
         condition: service_healthy

@@ -65,4 +65,87 @@ sealed class AppDestination(val route: String) {
             }
         }
     }
+
+    data object ItemSelect : AppDestination(
+        "itemSelect?ownerKey={ownerKey}&rowId={rowId}&pendingItemId={pendingItemId}&initialQuery={initialQuery}",
+    ) {
+        const val BASE_ROUTE = "itemSelect"
+        const val OWNER_KEY_ARGUMENT = "ownerKey"
+        const val ROW_ID_ARGUMENT = "rowId"
+        const val PENDING_ITEM_ID_ARGUMENT = "pendingItemId"
+        const val INITIAL_QUERY_ARGUMENT = "initialQuery"
+        private const val NO_ID = -1L
+
+        fun createRoute(
+            ownerKey: Long? = null,
+            rowId: Long? = null,
+            pendingItemId: Long? = null,
+            initialQuery: String = "",
+        ): String {
+            val parameters = buildList {
+                ownerKey?.let { add("$OWNER_KEY_ARGUMENT=$it") }
+                rowId?.let { add("$ROW_ID_ARGUMENT=$it") }
+                pendingItemId?.let { add("$PENDING_ITEM_ID_ARGUMENT=$it") }
+                if (initialQuery.isNotBlank()) {
+                    add("$INITIAL_QUERY_ARGUMENT=${initialQuery.encodeURLQueryComponent()}")
+                }
+            }
+            return if (parameters.isEmpty()) {
+                BASE_ROUTE
+            } else {
+                "$BASE_ROUTE?${parameters.joinToString("&")}"
+            }
+        }
+
+        fun parseOptionalId(argumentValue: Long): Long? {
+            return argumentValue.takeUnless { it == NO_ID }
+        }
+
+        fun noIdDefaultValue(): Long = NO_ID
+    }
+
+    data object CreateItem : AppDestination(
+        "createItem?ownerKey={ownerKey}&rowId={rowId}&pendingItemId={pendingItemId}&initialQuery={initialQuery}&soldByWeight={soldByWeight}",
+    ) {
+        const val BASE_ROUTE = "createItem"
+        const val OWNER_KEY_ARGUMENT = "ownerKey"
+        const val ROW_ID_ARGUMENT = "rowId"
+        const val PENDING_ITEM_ID_ARGUMENT = "pendingItemId"
+        const val INITIAL_QUERY_ARGUMENT = "initialQuery"
+        const val SOLD_BY_WEIGHT_ARGUMENT = "soldByWeight"
+        private const val NO_ID = -1L
+
+        fun createRoute(
+            ownerKey: Long? = null,
+            rowId: Long? = null,
+            pendingItemId: Long? = null,
+            initialQuery: String = "",
+            soldByWeight: Boolean = false,
+        ): String {
+            val parameters = buildList {
+                ownerKey?.let { add("$OWNER_KEY_ARGUMENT=$it") }
+                rowId?.let { add("$ROW_ID_ARGUMENT=$it") }
+                pendingItemId?.let { add("$PENDING_ITEM_ID_ARGUMENT=$it") }
+                if (initialQuery.isNotBlank()) {
+                    add("$INITIAL_QUERY_ARGUMENT=${initialQuery.encodeURLQueryComponent()}")
+                }
+                if (soldByWeight) {
+                    add("$SOLD_BY_WEIGHT_ARGUMENT=true")
+                }
+            }
+            return if (parameters.isEmpty()) {
+                BASE_ROUTE
+            } else {
+                "$BASE_ROUTE?${parameters.joinToString("&")}"
+            }
+        }
+
+        fun parseOptionalId(argumentValue: Long): Long? {
+            return argumentValue.takeUnless { it == NO_ID }
+        }
+
+        fun noIdDefaultValue(): Long = NO_ID
+    }
+
+    data object NeedBarcodeFilled : AppDestination("needBarcodeFilled")
 }

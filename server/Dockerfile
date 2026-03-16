@@ -2,7 +2,7 @@ FROM gradle:8.14.3-jdk17 AS build
 WORKDIR /workspace
 
 COPY . .
-RUN ./gradlew --configure-on-demand -PincludeComposeApp=false -PenableAndroidTargets=false :server:installDist --no-daemon
+RUN chmod +x ./gradlew && ./gradlew --configure-on-demand -PincludeComposeApp=false -PenableAndroidTargets=false :server:installDist --no-daemon
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
@@ -10,5 +10,6 @@ WORKDIR /app
 COPY --from=build /workspace/server/build/install/server /app
 
 EXPOSE 9878
+EXPOSE 5005
 
 ENTRYPOINT ["./bin/server"]

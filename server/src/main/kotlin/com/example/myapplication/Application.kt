@@ -2,26 +2,45 @@ package com.example.myapplication
 
 import com.example.myapplication.server.api.ErrorResponse
 import com.example.myapplication.server.api.CreateShopRequest
+import com.example.myapplication.server.api.CreateItemRequest
+import com.example.myapplication.server.api.ItemHighlightRangeResponse
+import com.example.myapplication.server.api.ItemLookupMatchResponse
+import com.example.myapplication.server.api.ItemLookupRequest
+import com.example.myapplication.server.api.ItemLookupResponse
+import com.example.myapplication.server.api.ItemSummaryResponse
 import com.example.myapplication.server.api.LoginRequest
 import com.example.myapplication.server.api.LoginResponse
+import com.example.myapplication.server.api.PriceObservationImportRequest
+import com.example.myapplication.server.api.PriceObservationImportResponse
+import com.example.myapplication.server.api.RetailerLookupResponse
 import com.example.myapplication.server.api.ShopResponse
 import com.example.myapplication.server.api.ShoppingListResponse
 import com.example.myapplication.server.api.ShoppingListsListResponse
 import com.example.myapplication.server.api.ShopsListResponse
+import com.example.myapplication.server.api.UnitResponse
 import com.example.myapplication.server.api.UpsertShoppingListRequest
 import com.example.myapplication.server.api.UserResponse
 import com.example.myapplication.server.api.UsersListResponse
 import com.example.myapplication.server.data.DatabaseFactory
 import com.example.myapplication.server.repository.CreateShopEntity
+import com.example.myapplication.server.repository.CreateCatalogItemEntity
+import com.example.myapplication.server.repository.HighlightRangeEntity
+import com.example.myapplication.server.repository.ItemCatalogService
+import com.example.myapplication.server.repository.ItemLookupEntity
+import com.example.myapplication.server.repository.ItemLookupMatchEntity
 import com.example.myapplication.server.repository.JsonShoppingListsRepository
 import com.example.myapplication.server.repository.LoginRepository
+import com.example.myapplication.server.repository.PostgresItemCatalogService
 import com.example.myapplication.server.repository.PostgresLoginRepository
 import com.example.myapplication.server.repository.PostgresShopsRepository
 import com.example.myapplication.server.repository.PostgresUsersRepository
+import com.example.myapplication.server.repository.PriceObservationImportRowEntity
+import com.example.myapplication.server.repository.RetailerPriceEntity
 import com.example.myapplication.server.repository.ShopEntity
 import com.example.myapplication.server.repository.ShoppingListWithShopEntity
 import com.example.myapplication.server.repository.ShoppingListsRepository
 import com.example.myapplication.server.repository.ShopsRepository
+import com.example.myapplication.server.repository.UnitCode
 import com.example.myapplication.server.repository.UpsertShoppingListEntity
 import com.example.myapplication.server.repository.UsersRepository
 import io.ktor.http.HttpStatusCode
@@ -151,6 +170,7 @@ fun Application.module(
     usersRepository: UsersRepository = PostgresUsersRepository(),
     shopsRepository: ShopsRepository = PostgresShopsRepository(),
     shoppingListsRepository: ShoppingListsRepository = JsonShoppingListsRepository(shopsRepository = shopsRepository),
+    itemCatalogService: ItemCatalogService = PostgresItemCatalogService(),
 ) {
     install(ContentNegotiation) {
         json()
@@ -300,6 +320,97 @@ fun Application.module(
             }
         }
 
+        suspend fun ApplicationCall.respondWithItemLookup() {
+            val request = receive<ItemLookupRequest>()
+            val lookupResult = itemCatalogService.lookup(
+                query = request.query,
+                soldByWeight = request.soldByWeight,
+            )
+
+            if (lookupResult.isSuccess) {
+                respond(
+                    status = HttpStatusCode.OK,
+                    message = lookupResult.getOrThrow().toResponse(),
+                )
+            } else {
+                val exception = lookupResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to lookup item"),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithCreatedItem() {
+            val request = receive<CreateItemRequest>()
+            val createResult = itemCatalogService.createItem(
+                CreateCatalogItemEntity(
+                    barcode = request.barcode,
+                    mainName = request.mainName,
+                    aliasNames = request.aliasNames,
+                    unit = request.unit.toDomain(),
+                ),
+            )
+
+            if (createResult.isSuccess) {
+                respond(
+                    status = HttpStatusCode.Created,
+                    message = createResult.getOrThrow().toResponse(),
+                )
+            } else {
+                val exception = createResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to create item"),
+                )
+            }
+        }
+
+        suspend fun ApplicationCall.respondWithImportedPriceObservations() {
+            val request = receive<PriceObservationImportRequest>()
+            val importResult = itemCatalogService.importPriceObservations(
+                shopId = request.shopId,
+                paymentTime = request.paymentTime,
+                rows = request.rows.map { row ->
+                    PriceObservationImportRowEntity(
+                        itemBarcode = row.itemBarcode,
+                        price = row.price,
+                        discountPercent = row.discountPercent,
+                        finalPrice = row.finalPrice,
+                    )
+                },
+            )
+
+            if (importResult.isSuccess) {
+                val result = importResult.getOrThrow()
+                respond(
+                    status = HttpStatusCode.OK,
+                    message = PriceObservationImportResponse(
+                        insertedCount = result.insertedCount,
+                        skippedCount = result.skippedCount,
+                    ),
+                )
+            } else {
+                val exception = importResult.exceptionOrNull()
+                respond(
+                    status = if (exception is IllegalArgumentException) {
+                        HttpStatusCode.BadRequest
+                    } else {
+                        HttpStatusCode.InternalServerError
+                    },
+                    message = ErrorResponse(exception?.message ?: "Unable to import price observations"),
+                )
+            }
+        }
+
         suspend fun ApplicationCall.respondWithUpdatedShoppingList(id: Long) {
             val request = receive<UpsertShoppingListRequest>()
             val updateResult = shoppingListsRepository.update(
@@ -374,7 +485,10 @@ fun Application.module(
             if (loginResult.isSuccess) {
                 call.respond(
                     status = HttpStatusCode.OK,
-                    message = LoginResponse(success = true, message = "Login successful"),
+                    message = LoginResponse(
+                        success = true,
+                        message = "Login successful",
+                    ),
                 )
             } else {
                 call.respond(
@@ -427,6 +541,18 @@ fun Application.module(
 
         post("/stores") {
             call.respondWithCreatedShop()
+        }
+
+        post("/items/lookup") {
+            call.respondWithItemLookup()
+        }
+
+        post("/items") {
+            call.respondWithCreatedItem()
+        }
+
+        post("/price-observations/import") {
+            call.respondWithImportedPriceObservations()
         }
 
         get("/shopping-lists") {
@@ -496,4 +622,71 @@ private fun ShoppingListWithShopEntity.toResponse(): ShoppingListResponse {
         paidAt = paidAt,
         totalAmountMinor = totalAmountMinor,
     )
+}
+
+private fun com.example.myapplication.server.repository.CatalogItemEntity.toResponse(): ItemSummaryResponse {
+    return ItemSummaryResponse(
+        barcode = barcode,
+        mainName = mainName,
+        names = names,
+        unit = unit.toResponse(),
+    )
+}
+
+private fun ItemLookupEntity.toResponse(): ItemLookupResponse {
+    return when (this) {
+        is ItemLookupEntity.Single -> ItemLookupResponse(
+            kind = "single_match",
+            item = item.toResponse(),
+            normalizedBarcode = normalizedBarcode,
+            suggestedAmount = suggestedAmount,
+            retailer = retailerPrice?.toResponse(),
+        )
+
+        is ItemLookupEntity.Multiple -> ItemLookupResponse(
+            kind = "multiple_matches",
+            matches = matches.map(ItemLookupMatchEntity::toResponse),
+        )
+
+        is ItemLookupEntity.Create -> ItemLookupResponse(
+            kind = "create_item",
+            normalizedBarcode = normalizedBarcode,
+            suggestedAmount = suggestedAmount,
+            suggestedNames = suggestedNames,
+            suggestedUnit = suggestedUnit?.toResponse(),
+            retailer = retailerPrice?.toResponse(),
+        )
+    }
+}
+
+private fun ItemLookupMatchEntity.toResponse(): ItemLookupMatchResponse {
+    return ItemLookupMatchResponse(
+        item = item.toResponse(),
+        matchedName = matchedName,
+        highlightRanges = highlightRanges.map(HighlightRangeEntity::toResponse),
+    )
+}
+
+private fun HighlightRangeEntity.toResponse(): ItemHighlightRangeResponse {
+    return ItemHighlightRangeResponse(
+        start = start,
+        endExclusive = endExclusive,
+    )
+}
+
+private fun RetailerPriceEntity.toResponse(): RetailerLookupResponse {
+    return RetailerLookupResponse(
+        unit = unit.toResponse(),
+        price = price,
+        discountPercent = discountPercent,
+        finalPrice = finalPrice,
+    )
+}
+
+private fun UnitCode.toResponse(): UnitResponse {
+    return UnitResponse.valueOf(name)
+}
+
+private fun UnitResponse.toDomain(): UnitCode {
+    return UnitCode.valueOf(name)
 }

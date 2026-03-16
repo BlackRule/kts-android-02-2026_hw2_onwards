@@ -4,6 +4,7 @@ import com.example.myapplication.DEFAULT_LOGIN_PASSWORD
 import com.example.myapplication.DEFAULT_LOGIN_USERNAME
 import com.example.myapplication.server.repository.ShopEntity
 import kotlinx.serialization.json.Json
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -13,7 +14,7 @@ import java.sql.Types
 
 object DatabaseFactory {
 
-    private val databaseUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/myapplication"
+    private val databaseUrl = resolveDatabaseUrl()
     private val databaseUser = System.getenv("DB_USER") ?: "myapp"
     private val databasePassword = System.getenv("DB_PASSWORD") ?: "myapp"
     private val configuredShopsSeedPath = System.getenv("SHOPS_FILE_PATH")
@@ -36,23 +37,48 @@ object DatabaseFactory {
 
     fun getConnection(): Connection = DriverManager.getConnection(databaseUrl, databaseUser, databasePassword)
 
+    private fun resolveDatabaseUrl(
+        environment: Map<String, String> = System.getenv(),
+    ): String {
+        environment["DB_URL"]
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { return it }
+
+        val configuredServerBaseUrl = environment["SERVER_BASE_URL"]
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: DEFAULT_SERVER_BASE_URL
+
+        val databaseHost = runCatching {
+            URI.create(configuredServerBaseUrl).host
+        }.getOrNull()
+            ?.takeIf { it.isNotBlank() && it != "0.0.0.0" }
+            ?: environment["SERVER_HOST"]
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() && it != "0.0.0.0" }
+            ?: DEFAULT_SERVER_HOST
+
+        return "jdbc:postgresql://$databaseHost:5432/myapplication"
+    }
+
     private fun createTables(connection: Connection) {
         connection.createStatement().use { statement ->
-            statement.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS auth_users (
-                    id BIGSERIAL PRIMARY KEY,
-                    username VARCHAR(128) NOT NULL UNIQUE,
-                    password VARCHAR(128) NOT NULL
-                )
-                """.trimIndent(),
-            )
             statement.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id BIGINT PRIMARY KEY,
                     full_name VARCHAR(255) NOT NULL,
                     position VARCHAR(255) NOT NULL
+                )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS auth_users (
+                    id BIGSERIAL PRIMARY KEY,
+                    username VARCHAR(128) NOT NULL UNIQUE,
+                    password VARCHAR(128) NOT NULL
                 )
                 """.trimIndent(),
             )
@@ -72,13 +98,59 @@ object DatabaseFactory {
                 )
                 """.trimIndent(),
             )
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS units (
+                    code VARCHAR(32) PRIMARY KEY
+                )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS items (
+                    barcode VARCHAR(64) PRIMARY KEY,
+                    main_name TEXT NOT NULL,
+                    unit_code VARCHAR(32) NOT NULL REFERENCES units(code)
+                )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS item_names (
+                    id BIGSERIAL PRIMARY KEY,
+                    item_barcode VARCHAR(64) NOT NULL REFERENCES items(barcode) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    CONSTRAINT uq_item_names UNIQUE(item_barcode, name)
+                )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS price_observations (
+                    id BIGSERIAL PRIMARY KEY,
+                    shop_id BIGINT NOT NULL REFERENCES shops(id),
+                    item_barcode VARCHAR(64) NOT NULL REFERENCES items(barcode),
+                    price NUMERIC(12, 2) NOT NULL,
+                    discount_percent NUMERIC(5, 2) NOT NULL,
+                    final_price NUMERIC(12, 2) NOT NULL,
+                    payment_time TIMESTAMP NOT NULL
+                )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_price_observations_identity
+                ON price_observations(shop_id, item_barcode, price, final_price)
+                """.trimIndent(),
+            )
         }
     }
 
     private fun seedData(connection: Connection) {
-        seedAuthUsers(connection)
         seedUsers(connection)
+        seedAuthUsers(connection)
         seedShops(connection)
+        seedUnits(connection)
     }
 
     private fun seedAuthUsers(connection: Connection) {
@@ -209,7 +281,24 @@ object DatabaseFactory {
             statement.execute()
         }
     }
+
+    private fun seedUnits(connection: Connection) {
+        connection.prepareStatement(
+            """
+            INSERT INTO units(code)
+            VALUES (?), (?)
+            ON CONFLICT (code) DO NOTHING
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, "PIECE")
+            statement.setString(2, "KG")
+            statement.executeUpdate()
+        }
+    }
 }
+
+private const val DEFAULT_SERVER_HOST = "195.46.171.236"
+private const val DEFAULT_SERVER_BASE_URL = "https://$DEFAULT_SERVER_HOST:9878"
 
 private fun java.sql.PreparedStatement.setNullableString(index: Int, value: String?) {
     if (value == null) {

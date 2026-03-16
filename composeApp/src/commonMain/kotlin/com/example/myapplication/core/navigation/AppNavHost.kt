@@ -9,6 +9,9 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.myapplication.feature.shopPicker.model.ShopItem
+import com.example.myapplication.feature.itemCatalog.presentation.CreateItemScreen
+import com.example.myapplication.feature.itemCatalog.presentation.ItemSelectScreen
+import com.example.myapplication.feature.itemCatalog.presentation.NeedBarcodeFilledScreen
 import com.example.myapplication.feature.login.presentation.LoginScreen
 import com.example.myapplication.feature.onboarding.presentation.WelcomeScreen
 import com.example.myapplication.feature.shoppingList.presentation.ShoppingListScreen
@@ -84,6 +87,17 @@ fun AppNavHost(
                         AppDestination.ShopPicker.createRoute(selectionMode = true),
                     )
                 },
+                onOpenItemSelect = { ownerKey, rowId ->
+                    navController.navigate(
+                        AppDestination.ItemSelect.createRoute(
+                            ownerKey = ownerKey,
+                            rowId = rowId,
+                        ),
+                    )
+                },
+                onOpenNeedBarcode = {
+                    navController.navigate(AppDestination.NeedBarcodeFilled.route)
+                },
                 onSaved = { navController.popBackStack() },
             )
         }
@@ -157,6 +171,121 @@ fun AppNavHost(
                         }
                         launchSingleTop = true
                     }
+                },
+            )
+        }
+        composable(
+            route = AppDestination.ItemSelect.route,
+            arguments = listOf(
+                navArgument(AppDestination.ItemSelect.OWNER_KEY_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.ItemSelect.noIdDefaultValue()
+                },
+                navArgument(AppDestination.ItemSelect.ROW_ID_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.ItemSelect.noIdDefaultValue()
+                },
+                navArgument(AppDestination.ItemSelect.PENDING_ITEM_ID_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.ItemSelect.noIdDefaultValue()
+                },
+                navArgument(AppDestination.ItemSelect.INITIAL_QUERY_ARGUMENT) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { backStackEntry ->
+            ItemSelectScreen(
+                ownerKey = AppDestination.ItemSelect.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.ItemSelect.OWNER_KEY_ARGUMENT)
+                        ?: AppDestination.ItemSelect.noIdDefaultValue(),
+                ),
+                rowId = AppDestination.ItemSelect.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.ItemSelect.ROW_ID_ARGUMENT)
+                        ?: AppDestination.ItemSelect.noIdDefaultValue(),
+                ),
+                pendingItemId = AppDestination.ItemSelect.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.ItemSelect.PENDING_ITEM_ID_ARGUMENT)
+                        ?: AppDestination.ItemSelect.noIdDefaultValue(),
+                ),
+                initialQuery = backStackEntry.arguments
+                    ?.getString(AppDestination.ItemSelect.INITIAL_QUERY_ARGUMENT)
+                    .orEmpty(),
+                onBack = { navController.popBackStack() },
+                onOpenCreateItem = { ownerKey, rowId, pendingItemId, initialQuery, soldByWeight ->
+                    navController.navigate(
+                        AppDestination.CreateItem.createRoute(
+                            ownerKey = ownerKey,
+                            rowId = rowId,
+                            pendingItemId = pendingItemId,
+                            initialQuery = initialQuery,
+                            soldByWeight = soldByWeight,
+                        ),
+                    )
+                },
+            )
+        }
+        composable(
+            route = AppDestination.CreateItem.route,
+            arguments = listOf(
+                navArgument(AppDestination.CreateItem.OWNER_KEY_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.CreateItem.noIdDefaultValue()
+                },
+                navArgument(AppDestination.CreateItem.ROW_ID_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.CreateItem.noIdDefaultValue()
+                },
+                navArgument(AppDestination.CreateItem.PENDING_ITEM_ID_ARGUMENT) {
+                    type = NavType.LongType
+                    defaultValue = AppDestination.CreateItem.noIdDefaultValue()
+                },
+                navArgument(AppDestination.CreateItem.INITIAL_QUERY_ARGUMENT) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(AppDestination.CreateItem.SOLD_BY_WEIGHT_ARGUMENT) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { backStackEntry ->
+            CreateItemScreen(
+                ownerKey = AppDestination.CreateItem.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.CreateItem.OWNER_KEY_ARGUMENT)
+                        ?: AppDestination.CreateItem.noIdDefaultValue(),
+                ),
+                rowId = AppDestination.CreateItem.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.CreateItem.ROW_ID_ARGUMENT)
+                        ?: AppDestination.CreateItem.noIdDefaultValue(),
+                ),
+                pendingItemId = AppDestination.CreateItem.parseOptionalId(
+                    backStackEntry.arguments?.getLong(AppDestination.CreateItem.PENDING_ITEM_ID_ARGUMENT)
+                        ?: AppDestination.CreateItem.noIdDefaultValue(),
+                ),
+                initialQuery = backStackEntry.arguments
+                    ?.getString(AppDestination.CreateItem.INITIAL_QUERY_ARGUMENT)
+                    .orEmpty(),
+                soldByWeight = backStackEntry.arguments
+                    ?.getBoolean(AppDestination.CreateItem.SOLD_BY_WEIGHT_ARGUMENT)
+                    ?: false,
+                onBack = { navController.popBackStack() },
+                onFinished = {
+                    navController.popBackStack()
+                    navController.popBackStack()
+                },
+            )
+        }
+        composable(AppDestination.NeedBarcodeFilled.route) {
+            NeedBarcodeFilledScreen(
+                onBack = { navController.popBackStack() },
+                onOpenItemSelect = { pendingItemId, initialQuery ->
+                    navController.navigate(
+                        AppDestination.ItemSelect.createRoute(
+                            pendingItemId = pendingItemId,
+                            initialQuery = initialQuery,
+                        ),
+                    )
                 },
             )
         }

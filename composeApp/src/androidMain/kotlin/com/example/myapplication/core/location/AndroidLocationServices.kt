@@ -10,6 +10,15 @@ import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.core.os.CancellationSignal
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.example.myapplication.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -21,12 +30,50 @@ val locationPermissions: Array<String> = arrayOf(
     Manifest.permission.ACCESS_COARSE_LOCATION,
 )
 
-data class ResolvedAddress(
-    val latitude: Double,
-    val longitude: Double,
-    val city: String?,
-    val address: String?,
-)
+@Composable
+actual fun rememberLocationPermissionState(): LocationPermissionState {
+    val context = LocalContext.current
+    var hasPermissionState by remember {
+        mutableStateOf(context.hasLocationPermission())
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        hasPermissionState = context.hasLocationPermission()
+    }
+
+    return remember(context, permissionLauncher) {
+        object : LocationPermissionState {
+            override val hasPermission: Boolean
+                get() = hasPermissionState
+
+            override fun requestPermission() {
+                if (context.hasLocationPermission()) {
+                    hasPermissionState = true
+                } else {
+                    permissionLauncher.launch(locationPermissions)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+actual fun rememberLocationService(): LocationService {
+    val context = LocalContext.current
+    return remember(context) {
+        object : LocationService {
+            override suspend fun findCurrentLocation(): GeoPoint? = context.findCurrentLocation()
+
+            override suspend fun reverseGeocode(point: GeoPoint): ResolvedAddress? = context.reverseGeocode(point)
+
+            override suspend fun searchAddress(query: String): ResolvedAddress? = context.searchAddress(query)
+        }
+    }
+}
+
+actual fun platformHasMapPicker(): Boolean = BuildConfig.MAPKIT_API_KEY.isNotBlank()
 
 fun Context.hasLocationPermission(): Boolean {
     return locationPermissions.any { permission ->
