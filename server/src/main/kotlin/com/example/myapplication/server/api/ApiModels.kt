@@ -18,6 +18,16 @@ data class LoginRequest(
 data class LoginResponse(
     val success: Boolean,
     val message: String,
+    val token: String? = null,
+    val user: AuthenticatedUserResponse? = null,
+)
+
+@Serializable
+data class AuthenticatedUserResponse(
+    val id: Long,
+    val username: String,
+    val fullName: String,
+    val position: String,
 )
 
 @Serializable

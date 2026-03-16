@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.Modifier
@@ -24,9 +25,16 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.myapplication.common.ui.theme.AppTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.example.myapplication.common.ui.asString
+import com.example.myapplication.common.ui.theme.AppTheme
 import com.example.myapplication.common.ui.theme.Dimens
+import com.example.myapplication.core.di.LocalAppContainer
+import com.example.myapplication.core.di.ProvideAppContainer
+import com.example.myapplication.core.session.SessionRepository
+import com.example.myapplication.feature.login.repository.LoginRepository
 import myapplication.composeapp.generated.resources.Res
 import myapplication.composeapp.generated.resources.login_password_label
 import myapplication.composeapp.generated.resources.login_password_placeholder
@@ -41,8 +49,19 @@ import kotlinx.coroutines.flow.collect
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: LoginViewModel = viewModel(),
 ) {
+    val appContainer = LocalAppContainer.current
+    val viewModel: LoginViewModel = viewModel(
+        factory = remember(
+            appContainer.loginRepository,
+            appContainer.sessionRepository,
+        ) {
+            loginViewModelFactory(
+                loginRepository = appContainer.loginRepository,
+                sessionRepository = appContainer.sessionRepository,
+            )
+        },
+    )
     val state by viewModel.state.collectAsState()
     val autofillManager = LocalAutofillManager.current
 
@@ -99,7 +118,7 @@ fun LoginScreen(
         )
         state.error?.let { errorText ->
             Text(
-                text = errorText,
+                text = errorText.asString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -119,8 +138,23 @@ fun LoginScreen(
 @Composable
 private fun LoginScreenPreview() {
     AppTheme {
-        LoginScreen(
-            onLoginSuccess = {}
-        )
+        ProvideAppContainer {
+            LoginScreen(onLoginSuccess = {})
+        }
+    }
+}
+
+private fun loginViewModelFactory(
+    loginRepository: LoginRepository,
+    sessionRepository: SessionRepository,
+): ViewModelProvider.Factory {
+    return object : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return LoginViewModel(
+                loginRepository = loginRepository,
+                sessionRepository = sessionRepository,
+            ) as T
+        }
     }
 }

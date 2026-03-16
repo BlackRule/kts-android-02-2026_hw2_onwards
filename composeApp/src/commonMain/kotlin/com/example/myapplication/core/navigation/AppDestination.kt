@@ -6,6 +6,7 @@ sealed class AppDestination(val route: String) {
     data object Welcome : AppDestination("welcome")
     data object Login : AppDestination("login")
     data object ShoppingLists : AppDestination("shoppingLists")
+    data object Profile : AppDestination("profile")
     data object ShoppingList : AppDestination("shoppingList?shoppingListId={shoppingListId}") {
         const val BASE_ROUTE = "shoppingList"
         const val SHOPPING_LIST_ID_ARGUMENT = "shoppingListId"

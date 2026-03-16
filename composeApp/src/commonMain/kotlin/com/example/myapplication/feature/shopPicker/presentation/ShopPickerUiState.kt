@@ -7,6 +7,7 @@ data class ShopPickerUiState(
     val shops: List<ShopItem> = emptyList(),
     val closestShopId: Long? = null,
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val isLoadingNextPage: Boolean = false,
     val errorMessage: String? = null,
     val paginationError: String? = null,

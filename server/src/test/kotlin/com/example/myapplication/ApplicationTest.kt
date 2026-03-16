@@ -2,6 +2,7 @@ package com.example.myapplication
 
 import com.example.myapplication.server.repository.CreateShopEntity
 import com.example.myapplication.server.repository.CreateCatalogItemEntity
+import com.example.myapplication.server.repository.AuthenticatedUserEntity
 import com.example.myapplication.server.repository.CatalogItemEntity
 import com.example.myapplication.server.repository.HighlightRangeEntity
 import com.example.myapplication.server.repository.ItemCatalogService
@@ -44,9 +45,16 @@ class ApplicationTest {
         override fun login(
             username: String,
             password: String,
-        ): Result<Unit> {
+        ): Result<AuthenticatedUserEntity> {
             return if (username == DEFAULT_LOGIN_USERNAME && password == DEFAULT_LOGIN_PASSWORD) {
-                Result.success(Unit)
+                Result.success(
+                    AuthenticatedUserEntity(
+                        id = 2L,
+                        username = DEFAULT_LOGIN_USERNAME,
+                        fullName = "Liam Johnson",
+                        position = "Android Engineer",
+                    ),
+                )
             } else {
                 Result.failure(IllegalArgumentException("Invalid username or password"))
             }
@@ -388,6 +396,8 @@ class ApplicationTest {
 
         assertEquals(HttpStatusCode.OK, response.status)
         assertContains(response.bodyAsText(), "\"success\":true")
+        assertContains(response.bodyAsText(), "\"token\"")
+        assertContains(response.bodyAsText(), "Liam Johnson")
     }
 
     @Test

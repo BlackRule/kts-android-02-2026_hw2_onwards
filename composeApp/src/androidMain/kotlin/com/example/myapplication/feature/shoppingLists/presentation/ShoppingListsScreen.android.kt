@@ -22,6 +22,7 @@ import org.jetbrains.compose.resources.stringResource
 actual fun ShoppingListsScreen(
     onCreateShoppingList: () -> Unit,
     onEditShoppingList: (Long) -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier,
 ) {
     val viewModel: ShoppingListsViewModel = viewModel()
@@ -55,6 +56,7 @@ actual fun ShoppingListsScreen(
         state = state,
         onCreateShoppingList = onCreateShoppingList,
         onEditShoppingList = onEditShoppingList,
+        onOpenProfile = onOpenProfile,
         onDeleteShoppingList = { pendingDeleteShoppingListId = it },
         onRetry = viewModel::refresh,
         modifier = modifier,

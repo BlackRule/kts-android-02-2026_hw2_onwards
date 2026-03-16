@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 
 class ShopsRepository(
     private val httpClient: HttpClient = AppHttpClient.instance,
+    private val cacheDataSource: ShopsCacheDataSource = NoOpShopsCacheDataSource,
 ) {
 
     suspend fun getShops(
@@ -32,11 +33,22 @@ class ShopsRepository(
                     parameter("pageSize", pageSize)
                 }.body<ShopsListResponse>()
 
-                Result.success(response.toDomain())
+                val pageResponse = response.toDomain()
+                cacheDataSource.upsertShops(pageResponse.shops)
+                Result.success(pageResponse)
             } catch (cancellationException: CancellationException) {
                 throw cancellationException
             } catch (exception: Exception) {
-                Result.failure(exception)
+                val cachedPage = cacheDataSource.getShops(
+                    query = query,
+                    page = page,
+                    pageSize = pageSize,
+                )
+                if (cachedPage.shops.isNotEmpty()) {
+                    Result.success(cachedPage)
+                } else {
+                    Result.failure(exception)
+                }
             }
         }
     }
@@ -56,7 +68,9 @@ class ShopsRepository(
                     )
                 }.body<ShopResponse>()
 
-                Result.success(response.toDomain())
+                val createdShop = response.toDomain()
+                cacheDataSource.upsertShops(listOf(createdShop))
+                Result.success(createdShop)
             } catch (cancellationException: CancellationException) {
                 throw cancellationException
             } catch (exception: Exception) {

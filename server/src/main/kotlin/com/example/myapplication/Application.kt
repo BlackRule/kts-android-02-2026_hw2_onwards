@@ -8,6 +8,7 @@ import com.example.myapplication.server.api.ItemLookupMatchResponse
 import com.example.myapplication.server.api.ItemLookupRequest
 import com.example.myapplication.server.api.ItemLookupResponse
 import com.example.myapplication.server.api.ItemSummaryResponse
+import com.example.myapplication.server.api.AuthenticatedUserResponse
 import com.example.myapplication.server.api.LoginRequest
 import com.example.myapplication.server.api.LoginResponse
 import com.example.myapplication.server.api.PriceObservationImportRequest
@@ -54,6 +55,7 @@ import io.ktor.server.routing.*
 import io.ktor.serialization.kotlinx.json.*
 import java.io.File
 import java.security.KeyStore
+import java.util.UUID
 
 fun main() {
     val runtimeConfig = serverRuntimeConfigFromEnvironment()
@@ -483,11 +485,19 @@ fun Application.module(
             )
 
             if (loginResult.isSuccess) {
+                val authenticatedUser = loginResult.getOrThrow()
                 call.respond(
                     status = HttpStatusCode.OK,
                     message = LoginResponse(
                         success = true,
                         message = "Login successful",
+                        token = UUID.randomUUID().toString(),
+                        user = AuthenticatedUserResponse(
+                            id = authenticatedUser.id,
+                            username = authenticatedUser.username,
+                            fullName = authenticatedUser.fullName,
+                            position = authenticatedUser.position,
+                        ),
                     ),
                 )
             } else {

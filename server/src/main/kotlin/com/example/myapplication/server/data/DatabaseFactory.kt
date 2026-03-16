@@ -23,6 +23,7 @@ object DatabaseFactory {
     private val json = Json {
         ignoreUnknownKeys = true
     }
+    private const val DEFAULT_AUTH_USER_ID = 2L
 
     init {
         Class.forName("org.postgresql.Driver")
@@ -78,8 +79,15 @@ object DatabaseFactory {
                 CREATE TABLE IF NOT EXISTS auth_users (
                     id BIGSERIAL PRIMARY KEY,
                     username VARCHAR(128) NOT NULL UNIQUE,
-                    password VARCHAR(128) NOT NULL
+                    password VARCHAR(128) NOT NULL,
+                    user_id BIGINT REFERENCES users(id)
                 )
+                """.trimIndent(),
+            )
+            statement.executeUpdate(
+                """
+                ALTER TABLE auth_users
+                ADD COLUMN IF NOT EXISTS user_id BIGINT
                 """.trimIndent(),
             )
             statement.executeUpdate(
@@ -156,13 +164,16 @@ object DatabaseFactory {
     private fun seedAuthUsers(connection: Connection) {
         connection.prepareStatement(
             """
-            INSERT INTO auth_users(username, password)
-            VALUES (?, ?)
-            ON CONFLICT (username) DO NOTHING
+            INSERT INTO auth_users(username, password, user_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT (username) DO UPDATE
+            SET password = EXCLUDED.password,
+                user_id = EXCLUDED.user_id
             """.trimIndent(),
         ).use { statement ->
             statement.setString(1, DEFAULT_LOGIN_USERNAME)
             statement.setString(2, DEFAULT_LOGIN_PASSWORD)
+            statement.setLong(3, DEFAULT_AUTH_USER_ID)
             statement.executeUpdate()
         }
     }
