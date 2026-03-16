@@ -1,0 +1,11 @@
+.git
+.gitignore
+.gradle
+.idea
+.kotlin
+**/build
+composeApp/.cxx
+composeApp/.externalNativeBuild
+local.properties
+captures
+node_modules

@@ -16,7 +16,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -25,12 +28,12 @@ import com.example.myapplication.common.ui.theme.AppTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.common.ui.theme.Dimens
 import myapplication.composeapp.generated.resources.Res
-import myapplication.composeapp.generated.resources.login_email_label
-import myapplication.composeapp.generated.resources.login_email_placeholder
 import myapplication.composeapp.generated.resources.login_password_label
 import myapplication.composeapp.generated.resources.login_password_placeholder
 import myapplication.composeapp.generated.resources.login_sign_in_button
 import myapplication.composeapp.generated.resources.login_title
+import myapplication.composeapp.generated.resources.login_username_label
+import myapplication.composeapp.generated.resources.login_username_placeholder
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.flow.collect
 
@@ -41,11 +44,15 @@ fun LoginScreen(
     viewModel: LoginViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val autofillManager = LocalAutofillManager.current
 
-    LaunchedEffect(viewModel) {
+    LaunchedEffect(viewModel, autofillManager, onLoginSuccess) {
         viewModel.events.collect { event ->
             when (event) {
-                LoginUiEvent.LoginSuccessEvent -> onLoginSuccess()
+                LoginUiEvent.LoginSuccessEvent -> {
+                    autofillManager?.commit()
+                    onLoginSuccess()
+                }
             }
         }
     }
@@ -64,14 +71,16 @@ fun LoginScreen(
         TextField(
             value = state.username,
             onValueChange = viewModel::onUsernameChanged,
-            label = { Text(text = stringResource(Res.string.login_email_label)) },
-            placeholder = { Text(text = stringResource(Res.string.login_email_placeholder)) },
+            label = { Text(text = stringResource(Res.string.login_username_label)) },
+            placeholder = { Text(text = stringResource(Res.string.login_username_placeholder)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next,
             ),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .contentType(ContentType.Username + ContentType.NewUsername),
         )
         TextField(
             value = state.password,
@@ -84,7 +93,9 @@ fun LoginScreen(
                 imeAction = ImeAction.Done,
             ),
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .contentType(ContentType.Password + ContentType.NewPassword),
         )
         state.error?.let { errorText ->
             Text(
