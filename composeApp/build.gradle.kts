@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.ksp)
 }
 
 fun String.toBuildConfigString(): String {
@@ -58,6 +59,10 @@ kotlin {
             implementation(libs.ktor.clientOkHttp)
             implementation(libs.mlkit.barcode.scanning)
             implementation(libs.yandex.mapkit.lite)
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.room.ktx)
+            implementation(libs.androidx.datastore.preferences)
+            implementation(libs.androidx.swiperefreshlayout)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -117,4 +122,5 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+    add("kspAndroid", libs.androidx.room.compiler)
 }

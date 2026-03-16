@@ -16,6 +16,7 @@
     <string name="login_password_label">Password</string>
     <string name="login_password_placeholder">Your password</string>
     <string name="login_sign_in_button">Sign in</string>
+    <string name="login_invalid_credentials_error">Invalid username or password</string>
     <string name="shop_picker_title">Shop picker</string>
     <string name="shop_picker_search_label">Search shops</string>
     <string name="shop_picker_search_placeholder">Name, city, or address</string>
@@ -61,6 +62,7 @@
     <string name="create_shop_save_error">Unable to create shop</string>
     <string name="shopping_lists_title">Shopping lists</string>
     <string name="shopping_lists_add_button">New list</string>
+    <string name="shopping_lists_profile_button">Profile</string>
     <string name="shopping_lists_loading">Loading shopping lists...</string>
     <string name="shopping_lists_retry_button">Retry</string>
     <string name="shopping_lists_empty_title">No shopping lists yet</string>
@@ -145,4 +147,11 @@
     <string name="item_select_match_subtitle">%1$s • %2$s</string>
     <string name="unit_piece_label">Piece</string>
     <string name="unit_kg_label">KG</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_username_label">Username</string>
+    <string name="profile_full_name_label">Full name</string>
+    <string name="profile_position_label">Position</string>
+    <string name="profile_unavailable_message">Profile information is unavailable right now.</string>
+    <string name="profile_logout_button">Logout</string>
+    <string name="profile_logout_error">Unable to log out right now.</string>
 </resources>

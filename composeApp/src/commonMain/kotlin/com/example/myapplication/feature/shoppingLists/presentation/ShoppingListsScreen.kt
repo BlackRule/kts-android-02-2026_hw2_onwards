@@ -34,6 +34,7 @@ import myapplication.composeapp.generated.resources.shopping_lists_empty_message
 import myapplication.composeapp.generated.resources.shopping_lists_empty_title
 import myapplication.composeapp.generated.resources.shopping_lists_loading
 import myapplication.composeapp.generated.resources.shopping_lists_paid_at_label
+import myapplication.composeapp.generated.resources.shopping_lists_profile_button
 import myapplication.composeapp.generated.resources.shopping_lists_retry_button
 import myapplication.composeapp.generated.resources.shopping_lists_title
 import myapplication.composeapp.generated.resources.shopping_lists_total_label
@@ -43,6 +44,7 @@ import org.jetbrains.compose.resources.stringResource
 expect fun ShoppingListsScreen(
     onCreateShoppingList: () -> Unit,
     onEditShoppingList: (Long) -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 )
 
@@ -51,6 +53,7 @@ internal fun ShoppingListsContent(
     state: ShoppingListsUiState,
     onCreateShoppingList: () -> Unit,
     onEditShoppingList: (Long) -> Unit,
+    onOpenProfile: () -> Unit,
     onDeleteShoppingList: (Long) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -71,8 +74,13 @@ internal fun ShoppingListsContent(
                 text = stringResource(Res.string.shopping_lists_title),
                 style = MaterialTheme.typography.headlineMedium,
             )
-            Button(onClick = onCreateShoppingList) {
-                Text(text = stringResource(Res.string.shopping_lists_add_button))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onOpenProfile) {
+                    Text(text = stringResource(Res.string.shopping_lists_profile_button))
+                }
+                Button(onClick = onCreateShoppingList) {
+                    Text(text = stringResource(Res.string.shopping_lists_add_button))
+                }
             }
         }
 

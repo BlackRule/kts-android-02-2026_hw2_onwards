@@ -10,6 +10,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,13 +27,14 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class ShopPickerViewModel(
     private val shopsRepository: ShopsRepository = ShopsRepository(),
 ) : ViewModel() {
 
     private val screenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val searchQuery = MutableStateFlow("")
-    private val refreshRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val refreshRequests = MutableSharedFlow<FirstPageRequest.Refresh>(extraBufferCapacity = 1)
 
     private val _state = MutableStateFlow(ShopPickerUiState())
     val state: StateFlow<ShopPickerUiState> = _state.asStateFlow()
@@ -50,7 +53,11 @@ class ShopPickerViewModel(
     }
 
     fun retry() {
-        refreshRequests.tryEmit(_state.value.query.trim())
+        refresh()
+    }
+
+    fun refresh() {
+        refreshRequests.tryEmit(FirstPageRequest.Refresh(_state.value.query.trim()))
     }
 
     fun onUserLocationChanged(location: GeoPoint) {
@@ -109,40 +116,51 @@ class ShopPickerViewModel(
             merge(
                 searchQuery
                     .debounce(SEARCH_DEBOUNCE_MILLIS)
-                    .map { it.trim() }
+                    .map { query -> FirstPageRequest.Search(query.trim()) }
                     .distinctUntilChanged(),
                 refreshRequests,
             )
-                .onEach { query ->
-                    activeQuery = query
+                .onEach { request ->
+                    activeQuery = request.query
                     loadMoreJob?.cancel()
-                    _state.update {
-                        it.copy(
-                            isLoading = true,
-                            errorMessage = null,
-                            paginationError = null,
-                            isLoadingNextPage = false,
-                            shops = emptyList(),
-                            closestShopId = null,
-                            currentPage = 0,
-                            hasNextPage = false,
-                        )
+                    _state.update { state ->
+                        if (request is FirstPageRequest.Refresh && state.shops.isNotEmpty()) {
+                            state.copy(
+                                isLoading = false,
+                                isRefreshing = true,
+                                errorMessage = null,
+                                paginationError = null,
+                                isLoadingNextPage = false,
+                            )
+                        } else {
+                            state.copy(
+                                isLoading = true,
+                                isRefreshing = false,
+                                errorMessage = null,
+                                paginationError = null,
+                                isLoadingNextPage = false,
+                                shops = emptyList(),
+                                closestShopId = null,
+                                currentPage = 0,
+                                hasNextPage = false,
+                            )
+                        }
                     }
                 }
-                .flatMapLatest { query ->
+                .flatMapLatest { request ->
                     flow {
                         emit(
-                            query to shopsRepository.getShops(
-                                query = query,
+                            request to shopsRepository.getShops(
+                                query = request.query,
                                 page = FIRST_PAGE,
                                 pageSize = DEFAULT_SHOPS_PAGE_SIZE,
                             ),
                         )
                     }
                 }
-                .collect { (query, result) ->
+                .collect { (request, result) ->
                     handleFirstPageResult(
-                        query = query,
+                        request = request,
                         result = result,
                     )
                 }
@@ -150,10 +168,10 @@ class ShopPickerViewModel(
     }
 
     private fun handleFirstPageResult(
-        query: String,
+        request: FirstPageRequest,
         result: Result<ShopsPage>,
     ) {
-        activeQuery = query
+        activeQuery = request.query
         if (result.isSuccess) {
             val page = result.getOrThrow()
             _state.update {
@@ -162,6 +180,7 @@ class ShopPickerViewModel(
                     shops = presentation.shops,
                     closestShopId = presentation.closestShopId,
                     isLoading = false,
+                    isRefreshing = false,
                     errorMessage = null,
                     currentPage = page.page,
                     hasNextPage = page.hasNextPage,
@@ -170,17 +189,28 @@ class ShopPickerViewModel(
                 )
             }
         } else {
-            _state.update {
-                it.copy(
-                    shops = emptyList(),
-                    closestShopId = null,
-                    isLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message,
-                    currentPage = 0,
-                    hasNextPage = false,
-                    paginationError = null,
-                    isLoadingNextPage = false,
-                )
+            _state.update { state ->
+                if (request is FirstPageRequest.Refresh && state.shops.isNotEmpty()) {
+                    state.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = result.exceptionOrNull()?.message,
+                        paginationError = null,
+                        isLoadingNextPage = false,
+                    )
+                } else {
+                    state.copy(
+                        shops = emptyList(),
+                        closestShopId = null,
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = result.exceptionOrNull()?.message,
+                        currentPage = 0,
+                        hasNextPage = false,
+                        paginationError = null,
+                        isLoadingNextPage = false,
+                    )
+                }
             }
         }
     }
@@ -228,6 +258,14 @@ class ShopPickerViewModel(
         private const val FIRST_PAGE = 1
         private const val SEARCH_DEBOUNCE_MILLIS = 400L
     }
+}
+
+private sealed interface FirstPageRequest {
+    val query: String
+
+    data class Search(override val query: String) : FirstPageRequest
+
+    data class Refresh(override val query: String) : FirstPageRequest
 }
 
 private data class ShopPresentation(

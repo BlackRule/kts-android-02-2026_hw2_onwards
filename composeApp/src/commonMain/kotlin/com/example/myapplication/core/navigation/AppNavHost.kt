@@ -2,43 +2,70 @@ package com.example.myapplication.core.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.myapplication.core.di.LocalAppContainer
 import com.example.myapplication.feature.shopPicker.model.ShopItem
 import com.example.myapplication.feature.itemCatalog.presentation.CreateItemScreen
 import com.example.myapplication.feature.itemCatalog.presentation.ItemSelectScreen
 import com.example.myapplication.feature.itemCatalog.presentation.NeedBarcodeFilledScreen
 import com.example.myapplication.feature.login.presentation.LoginScreen
 import com.example.myapplication.feature.onboarding.presentation.WelcomeScreen
+import com.example.myapplication.feature.profile.presentation.ProfileScreen
 import com.example.myapplication.feature.shoppingList.presentation.ShoppingListScreen
 import com.example.myapplication.feature.shoppingLists.presentation.ShoppingListsScreen
 import com.example.myapplication.feature.shopCreation.presentation.CreateShopScreen
 import com.example.myapplication.feature.shopPicker.presentation.ShopPickerScreen
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
+    startDestination: String,
     modifier: Modifier = Modifier,
 ) {
+    val appContainer = LocalAppContainer.current
+    val sessionState = appContainer.sessionRepository.sessionState.collectAsState().value
+    val coroutineScope = rememberCoroutineScope()
+
     NavHost(
         navController = navController,
-        startDestination = AppDestination.Welcome.route,
+        startDestination = startDestination,
         modifier = modifier,
     ) {
         composable(AppDestination.Welcome.route) {
-            WelcomeScreen(onContinue = { navController.navigate(AppDestination.Login.route) })
+            WelcomeScreen(
+                onContinue = {
+                    coroutineScope.launch {
+                        appContainer.sessionRepository.markOnboardingCompleted()
+                        navController.navigate(
+                            if (sessionState.isLoggedIn) {
+                                AppDestination.ShoppingLists.route
+                            } else {
+                                AppDestination.Login.route
+                            },
+                        ) {
+                            popUpTo(AppDestination.Welcome.route) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    }
+                },
+            )
         }
         composable(AppDestination.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate(AppDestination.ShoppingLists.route) {
-                        popUpTo(AppDestination.Welcome.route) {
+                        popUpTo(AppDestination.Login.route) {
                             inclusive = true
                         }
                         launchSingleTop = true
@@ -53,6 +80,22 @@ fun AppNavHost(
                 },
                 onEditShoppingList = { shoppingListId ->
                     navController.navigate(AppDestination.ShoppingList.createRoute(shoppingListId))
+                },
+                onOpenProfile = {
+                    navController.navigate(AppDestination.Profile.route)
+                },
+            )
+        }
+        composable(AppDestination.Profile.route) {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedOut = {
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(AppDestination.ShoppingLists.route) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
                 },
             )
         }
